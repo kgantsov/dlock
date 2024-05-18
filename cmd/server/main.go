@@ -70,7 +70,7 @@ func main() {
 			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 				if ipnet.IP.To4() != nil {
 					fmt.Println("IPv4 address:", ipnet.IP.String())
-					currentIP = strings.Replace(ipnet.IP.String(), ".", "-")
+					currentIP = strings.Replace(ipnet.IP.String(), ".", "-", -1)
 				} else {
 					fmt.Println("IPv6 address:", ipnet.IP.String())
 				}
