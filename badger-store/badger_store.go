@@ -2,7 +2,6 @@ package badgerstore
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
@@ -206,7 +205,6 @@ func (b *BadgerStore) StoreLogs(logs []*raft.Log) error {
 			return err
 		}
 
-		fmt.Printf("=====> SET %+v %+v\n", string(dbLogs), bytesToUint64(key))
 		if err := txn.Set(addPrefix(dbLogs, key), val.Bytes()); err != nil {
 			return err
 		}
