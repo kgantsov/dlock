@@ -59,10 +59,22 @@ func main() {
 	hosts := []string{}
 
 	if nodeID == "" {
-		hostname, err := os.Hostname()
+		ipaddrs, err := net.InterfaceAddrs()
 		if err != nil {
-			fmt.Println("Error getting hostname:", err)
-			return
+			// handle error
+		}
+
+		currentIP := ""
+
+		for _, a := range ipaddrs {
+			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					fmt.Println("IPv4 address:", ipnet.IP.String())
+					currentIP = strings.Replace(ipnet.IP.String(), ".", "-")
+				} else {
+					fmt.Println("IPv6 address:", ipnet.IP.String())
+				}
+			}
 		}
 
 		service := "_http._tcp.dlock.default.svc.cluster.local"
@@ -73,7 +85,7 @@ func main() {
 		}
 
 		for _, srv := range addrs {
-			if strings.Contains(srv.Target, hostname) {
+			if strings.Contains(srv.Target, currentIP) {
 				nodeID = srv.Target
 			}
 			// fmt.Printf("Server: %s:%d (priority=%d, weight=%d)\n", srv.Target, srv.Port, srv.Priority, srv.Weight)
