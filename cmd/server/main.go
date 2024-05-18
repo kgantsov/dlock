@@ -92,6 +92,10 @@ func main() {
 		log.Fatalf("failed to create path for Raft storage: %s", err.Error())
 	}
 
+	if joinAddr == "" && len(hosts) > 0 {
+		joinAddr = fmt.Sprintf("%s:11000", hosts[0])
+	}
+
 	s := store.New(log, inmemory)
 	s.RaftDir = raftDir
 	s.RaftBind = raftAddr
@@ -105,10 +109,6 @@ func main() {
 			log.Errorf("failed to start HTTP service: %s", err.Error())
 		}
 	}()
-
-	if joinAddr == "" && len(hosts) > 0 {
-		joinAddr = fmt.Sprintf("%s:11000", hosts[0])
-	}
 
 	// If join was specified, make the join request.
 	if joinAddr != "" {
