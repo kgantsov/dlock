@@ -6,9 +6,11 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 
 	server "github.com/kgantsov/dlock/server"
 	"github.com/kgantsov/dlock/store"
@@ -54,9 +56,32 @@ func main() {
 		os.Exit(1)
 	}
 
+	hosts := []string{}
+
 	if nodeID == "" {
-		nodeID = raftAddr
+		hostname, err := os.Hostname()
+		if err != nil {
+			fmt.Println("Error getting hostname:", err)
+			return
+		}
+
+		service := "_http._tcp.dlock.default.svc.cluster.local"
+		_, addrs, err := net.LookupSRV("", "", service)
+		if err != nil {
+			log.Warningln("Error:", err)
+			return
+		}
+
+		for _, srv := range addrs {
+			if strings.Contains(srv.Target, hostname) {
+				nodeID = srv.Target
+			}
+			// fmt.Printf("Server: %s:%d (priority=%d, weight=%d)\n", srv.Target, srv.Port, srv.Priority, srv.Weight)
+			hosts = append(hosts, srv.Target)
+		}
 	}
+
+	log.Debugf("Current node is %s discovered hosts %+v", nodeID, hosts)
 
 	// Ensure Raft storage exists.
 	raftDir := flag.Arg(0)
@@ -80,6 +105,10 @@ func main() {
 			log.Errorf("failed to start HTTP service: %s", err.Error())
 		}
 	}()
+
+	if joinAddr == "" && len(hosts) > 0 {
+		joinAddr = fmt.Sprintf("%s:11000", hosts[0])
+	}
 
 	// If join was specified, make the join request.
 	if joinAddr != "" {
