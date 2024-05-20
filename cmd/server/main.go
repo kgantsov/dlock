@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"time"
 
 	server "github.com/kgantsov/dlock/server"
 	"github.com/kgantsov/dlock/store"
@@ -81,7 +83,7 @@ func main() {
 				hosts = append(hosts, srv.Target)
 			}
 
-			if !strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
+			if strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
 				joinAddr = fmt.Sprintf(
 					"%s-0.%s-internal.default.svc.cluster.local.:%s",
 					ServiceName,
@@ -125,8 +127,8 @@ func main() {
 	}()
 
 	// If join was specified, make the join request.
-	if joinAddr != "" {
-		if err := join(log, joinAddr, raftAddr, nodeID); err != nil {
+	if len(hosts) > 0 {
+		if err := Join(log, hosts, raftAddr, nodeID, 100); err != nil {
 			log.Fatalf("failed to join node at %s: %s", joinAddr, err.Error())
 		}
 	}
@@ -138,6 +140,24 @@ func main() {
 	signal.Notify(terminate, os.Interrupt)
 	<-terminate
 	log.Info("hraftd exiting")
+}
+
+func Join(log *logrus.Logger, targetAddrs []string, addr, id string, numAttempts int) error {
+
+	var err error
+	for i := 0; i < numAttempts; i++ {
+		for _, ta := range targetAddrs {
+			err = join(log, ta, addr, id)
+			if err == nil {
+				return nil
+			}
+			log.Warnf("failed to join via node at %s: %s", ta, err)
+		}
+	}
+	time.Sleep(time.Duration(1) * time.Second)
+
+	log.Warnf("failed to join cluster at %s, after %d attempt(s)", targetAddrs, numAttempts)
+	return errors.New("Failed to join")
 }
 
 func join(log *logrus.Logger, joinAddr, raftAddr, nodeID string) error {
