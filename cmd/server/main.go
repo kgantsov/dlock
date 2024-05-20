@@ -113,7 +113,7 @@ func main() {
 	s := store.New(log, inmemory)
 	s.RaftDir = raftDir
 	s.RaftBind = raftAddr
-	if err := s.Open(joinAddr == "" && len(hosts) == 1, nodeID); err != nil {
+	if err := s.Open(joinAddr == "" && len(hosts) < 2, nodeID); err != nil {
 		log.Fatalf("failed to open store: %s", err.Error())
 	}
 
