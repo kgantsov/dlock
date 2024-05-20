@@ -35,6 +35,7 @@ type Store struct {
 	RaftDir  string
 	RaftBind string
 	inmemory bool
+	ServerID raft.ServerID
 
 	mu sync.Mutex
 	m  map[string]bool // The key-value store for the system.
@@ -60,6 +61,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
+	s.ServerID = config.LocalID
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
@@ -113,7 +115,19 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 		ra.BootstrapCluster(configuration)
 	}
 
+	go s.ListenToLeaderChanges()
+
 	return nil
+}
+
+func (s *Store) ListenToLeaderChanges() {
+	for isLeader := range s.raft.LeaderCh() {
+		if isLeader {
+			s.logger.Infof("Node %s has become a leader", s.raft)
+		} else {
+			s.logger.Infof("Node %s lost leadership", s.raft)
+		}
+	}
 }
 
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
