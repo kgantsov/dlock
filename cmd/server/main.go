@@ -77,11 +77,17 @@ func main() {
 			for _, srv := range addrs {
 				if strings.HasPrefix(srv.Target, hostname) {
 					nodeID = srv.Target
+				} else {
+					hosts = append(hosts, srv.Target)
 				}
-				hosts = append(hosts, srv.Target)
+
 			}
 
-			if !strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
+			if strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
+				if len(hosts) >= 1 {
+					joinAddr = fmt.Sprintf("%s:%s", hosts[0], httpAddr)
+				}
+			} else {
 				joinAddr = fmt.Sprintf(
 					"%s-0.%s-internal.default.svc.cluster.local.:%s",
 					ServiceName,
@@ -89,6 +95,7 @@ func main() {
 					httpAddr,
 				)
 			}
+
 			raftAddr = fmt.Sprintf("%s:12000", nodeID)
 		}
 	}
