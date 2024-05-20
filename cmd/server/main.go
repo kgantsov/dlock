@@ -29,6 +29,7 @@ var httpAddr string
 var raftAddr string
 var joinAddr string
 var nodeID string
+var ServiceName string
 
 func init() {
 	flag.BoolVar(&inmemory, "inmemory", false, "Use in-memory storage for Raft")
@@ -36,6 +37,7 @@ func init() {
 	flag.StringVar(&raftAddr, "raddr", DefaultRaftAddr, "Set Raft bind address")
 	flag.StringVar(&joinAddr, "join", "", "Set join address, if any")
 	flag.StringVar(&nodeID, "id", "", "Node ID. If not set, same as Raft bind address")
+	flag.StringVar(&ServiceName, "service-name", "", "Name of the service in Kubernetes")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <raft-data-path> \n", os.Args[0])
 		flag.PrintDefaults()
@@ -59,41 +61,45 @@ func main() {
 	hosts := []string{}
 
 	if nodeID == "" {
-		ipaddrs, err := net.InterfaceAddrs()
+		hostname, err := os.Hostname()
 		if err != nil {
-			// handle error
-		}
-
-		currentIP := ""
-
-		for _, a := range ipaddrs {
-			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				if ipnet.IP.To4() != nil {
-					fmt.Println("IPv4 address:", ipnet.IP.String())
-					currentIP = strings.Replace(ipnet.IP.String(), ".", "-", -1)
-				} else {
-					fmt.Println("IPv6 address:", ipnet.IP.String())
-				}
-			}
-		}
-
-		service := "_http._tcp.dlock.default.svc.cluster.local"
-		_, addrs, err := net.LookupSRV("", "", service)
-		if err != nil {
-			log.Warningln("Error:", err)
+			fmt.Println("Error getting hostname:", err)
 			return
 		}
 
-		for _, srv := range addrs {
-			if strings.Contains(srv.Target, currentIP) {
-				nodeID = srv.Target
+		if ServiceName != "" {
+			service := fmt.Sprintf("%s-internal.default.svc.cluster.local", ServiceName)
+			_, addrs, err := net.LookupSRV("", "", service)
+			if err != nil {
+				log.Warningln("Error:", err)
 			}
-			// fmt.Printf("Server: %s:%d (priority=%d, weight=%d)\n", srv.Target, srv.Port, srv.Priority, srv.Weight)
-			hosts = append(hosts, srv.Target)
+
+			for _, srv := range addrs {
+				if strings.HasPrefix(srv.Target, hostname) {
+					nodeID = srv.Target
+				}
+				hosts = append(hosts, srv.Target)
+			}
+
+			if !strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
+				joinAddr = fmt.Sprintf(
+					"%s-0.%s-internal.default.svc.cluster.local.:%s",
+					ServiceName,
+					ServiceName,
+					httpAddr,
+				)
+			}
+			raftAddr = fmt.Sprintf("%s:12000", nodeID)
 		}
 	}
 
-	log.Debugf("Current node is %s discovered hosts %+v", nodeID, hosts)
+	log.Debugf(
+		"Current node is %s discovered hosts %+v joinAddr %s raftAddr %s",
+		nodeID,
+		hosts,
+		joinAddr,
+		raftAddr,
+	)
 
 	// Ensure Raft storage exists.
 	raftDir := flag.Arg(0)
@@ -102,10 +108,6 @@ func main() {
 	}
 	if err := os.MkdirAll(raftDir, 0700); err != nil {
 		log.Fatalf("failed to create path for Raft storage: %s", err.Error())
-	}
-
-	if joinAddr == "" && len(hosts) > 0 {
-		joinAddr = fmt.Sprintf("%s:11000", hosts[0])
 	}
 
 	s := store.New(log, inmemory)
