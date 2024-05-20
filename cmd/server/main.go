@@ -152,9 +152,9 @@ func Join(log *logrus.Logger, targetAddrs []string, addr, id string, numAttempts
 				return nil
 			}
 			log.Warnf("failed to join via node at %s: %s", ta, err)
+			time.Sleep(time.Duration(1) * time.Second)
 		}
 	}
-	time.Sleep(time.Duration(1) * time.Second)
 
 	log.Warnf("failed to join cluster at %s, after %d attempt(s)", targetAddrs, numAttempts)
 	return errors.New("Failed to join")
