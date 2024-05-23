@@ -64,7 +64,6 @@ func main() {
 
 	s := store.New(log, inmemory)
 	s.RaftDir = raftDir
-	s.RaftBind = raftAddr
 
 	var j *cluster.Joiner
 
@@ -82,6 +81,8 @@ func main() {
 
 		s.SetLeaderChangeFunc(cl.LeaderChanged)
 	}
+
+	s.RaftBind = raftAddr
 
 	if err := s.Open(true, nodeID); err != nil {
 		log.Fatalf("failed to open store: %s", err.Error())
