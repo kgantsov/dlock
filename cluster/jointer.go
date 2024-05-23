@@ -34,6 +34,7 @@ func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *
 
 func (j *Joiner) Join() error {
 	if len(j.hosts) == 0 {
+		j.logger.Debugf("There is no hosts to join: %d", len(j.hosts))
 		return nil
 	}
 
@@ -42,6 +43,7 @@ func (j *Joiner) Join() error {
 
 	for i := 0; i < 3; i++ {
 		for _, host = range j.hosts {
+			j.logger.Debugf("Trying to join: %s", host)
 			if err = j.join(host, j.raftAddr, j.nodeID); err == nil {
 				return nil
 			}
@@ -70,6 +72,11 @@ func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		fmt.Println("Non-OK HTTP status:", resp.StatusCode)
+		return errors.New(fmt.Sprintf("Failed to join: %s", joinAddr))
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	j.logger.Infof("JOINED %+v %+v", resp.StatusCode, string(body))
