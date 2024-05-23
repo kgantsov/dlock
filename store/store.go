@@ -35,9 +35,12 @@ type Store struct {
 	RaftDir  string
 	RaftBind string
 	inmemory bool
+	ServerID raft.ServerID
 
 	mu sync.Mutex
 	m  map[string]bool // The key-value store for the system.
+
+	leaderChangeFn func(bool)
 
 	raft *raft.Raft // The consensus mechanism
 
@@ -47,10 +50,15 @@ type Store struct {
 // New returns a new Store.
 func New(logger *logrus.Logger, inmemory bool) *Store {
 	return &Store{
-		m:        make(map[string]bool),
-		inmemory: inmemory,
-		logger:   logger,
+		m:              make(map[string]bool),
+		inmemory:       inmemory,
+		logger:         logger,
+		leaderChangeFn: func(bool) {},
 	}
+}
+
+func (s *Store) SetLeaderChangeFunc(leaderChangeFn func(bool)) {
+	s.leaderChangeFn = leaderChangeFn
 }
 
 // Open opens the store. If enableSingle is set, and there are no existing peers,
@@ -60,6 +68,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
+	s.ServerID = config.LocalID
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", s.RaftBind)
@@ -113,7 +122,20 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 		ra.BootstrapCluster(configuration)
 	}
 
+	go s.ListenToLeaderChanges()
+
 	return nil
+}
+
+func (s *Store) ListenToLeaderChanges() {
+	for isLeader := range s.raft.LeaderCh() {
+		if isLeader {
+			s.logger.Infof("Node %s has become a leader", s.ServerID)
+		} else {
+			s.logger.Infof("Node %s lost leadership", s.ServerID)
+		}
+		s.leaderChangeFn(isLeader)
+	}
 }
 
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
