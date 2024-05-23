@@ -67,6 +67,8 @@ func main() {
 
 	var j *cluster.Joiner
 
+	hosts := []string{}
+
 	if ServiceName != "" {
 		cl := cluster.NewCluster(log, "default", ServiceName, httpAddr)
 
@@ -78,8 +80,11 @@ func main() {
 		nodeID = cl.NodeID()
 		joinAddr = cl.JoinAddr()
 		raftAddr = cl.RaftAddr()
+		hosts = cl.Hosts()
 
 		s.SetLeaderChangeFunc(cl.LeaderChanged)
+	} else {
+		hosts = append(hosts, joinAddr)
 	}
 
 	s.RaftBind = raftAddr
@@ -97,7 +102,7 @@ func main() {
 
 	// If join was specified, make the join request.
 	if joinAddr != "" {
-		j = cluster.NewJoiner(log, nodeID, joinAddr, raftAddr)
+		j = cluster.NewJoiner(log, nodeID, raftAddr, hosts)
 
 		if err := j.Join(); err != nil {
 			log.Fatal(err.Error())

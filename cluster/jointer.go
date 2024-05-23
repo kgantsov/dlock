@@ -7,22 +7,23 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 type Joiner struct {
 	nodeID   string
-	joinAddr string
 	raftAddr string
+	hosts    []string
 
 	logger *logrus.Logger
 }
 
-func NewJoiner(logger *logrus.Logger, nodeID, joinAddr, raftAddr string) *Joiner {
+func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *Joiner {
 	j := &Joiner{
 		nodeID:   nodeID,
-		joinAddr: joinAddr,
+		hosts:    hosts,
 		raftAddr: raftAddr,
 
 		logger: logger,
@@ -32,15 +33,23 @@ func NewJoiner(logger *logrus.Logger, nodeID, joinAddr, raftAddr string) *Joiner
 }
 
 func (j *Joiner) Join() error {
-	if j.joinAddr == "" {
+	if len(j.hosts) == 0 {
 		return nil
 	}
 
-	if err := j.join(j.joinAddr, j.raftAddr, j.nodeID); err != nil {
-		return errors.New(fmt.Sprintf("failed to join node at %s: %s", j.joinAddr, err.Error()))
+	var host string
+	var err error
+
+	for i := 0; i < 3; i++ {
+		for _, host = range j.hosts {
+			if err = j.join(host, j.raftAddr, j.nodeID); err == nil {
+				return nil
+			}
+		}
+		time.Sleep(time.Duration(1) * time.Second)
 	}
 
-	return nil
+	return errors.New(fmt.Sprintf("failed to join node at %s: %s", host, err.Error()))
 }
 
 func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
