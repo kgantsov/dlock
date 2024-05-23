@@ -84,7 +84,9 @@ func main() {
 
 		s.SetLeaderChangeFunc(cl.LeaderChanged)
 	} else {
-		hosts = append(hosts, joinAddr)
+		if joinAddr != "" {
+			hosts = append(hosts, joinAddr)
+		}
 	}
 
 	s.RaftBind = raftAddr
@@ -101,12 +103,10 @@ func main() {
 	}()
 
 	// If join was specified, make the join request.
-	if joinAddr != "" {
-		j = cluster.NewJoiner(log, nodeID, raftAddr, hosts)
+	j = cluster.NewJoiner(log, nodeID, raftAddr, hosts)
 
-		if err := j.Join(); err != nil {
-			log.Fatal(err.Error())
-		}
+	if err := j.Join(); err != nil {
+		log.Fatal(err.Error())
 	}
 
 	// We're up and running!
