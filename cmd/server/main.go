@@ -103,7 +103,7 @@ func main() {
 	}()
 
 	// If join was specified, make the join request.
-	j = cluster.NewJoiner(log, nodeID, raftAddr, hosts)
+	j = cluster.NewJoiner(log, nodeID, raftAddr, httpAddr, hosts)
 
 	if err := j.Join(); err != nil {
 		log.Fatal(err.Error())
