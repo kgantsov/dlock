@@ -115,6 +115,10 @@ func (c *Cluster) JoinAddr() string {
 	return c.joinAddr
 }
 
+func (c *Cluster) RaftAddr() string {
+	return c.raftAddr
+}
+
 func (c *Cluster) Hosts() []string {
 	return c.hosts
 }

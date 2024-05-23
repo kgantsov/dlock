@@ -78,6 +78,7 @@ func main() {
 
 		nodeID = cl.NodeID()
 		joinAddr = cl.JoinAddr()
+		raftAddr = cl.RaftAddr()
 
 		s.SetLeaderChangeFunc(cl.LeaderChanged)
 	}
