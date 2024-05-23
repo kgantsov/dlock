@@ -40,6 +40,8 @@ type Store struct {
 	mu sync.Mutex
 	m  map[string]bool // The key-value store for the system.
 
+	leaderChangeFn func(bool)
+
 	raft *raft.Raft // The consensus mechanism
 
 	logger *logrus.Logger
@@ -48,10 +50,15 @@ type Store struct {
 // New returns a new Store.
 func New(logger *logrus.Logger, inmemory bool) *Store {
 	return &Store{
-		m:        make(map[string]bool),
-		inmemory: inmemory,
-		logger:   logger,
+		m:              make(map[string]bool),
+		inmemory:       inmemory,
+		logger:         logger,
+		leaderChangeFn: func(bool) {},
 	}
+}
+
+func (s *Store) SetLeaderChangeFunc(leaderChangeFn func(bool)) {
+	s.leaderChangeFn = leaderChangeFn
 }
 
 // Open opens the store. If enableSingle is set, and there are no existing peers,
@@ -123,10 +130,11 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 func (s *Store) ListenToLeaderChanges() {
 	for isLeader := range s.raft.LeaderCh() {
 		if isLeader {
-			s.logger.Infof("Node %s has become a leader", s.raft)
+			s.logger.Infof("Node %s has become a leader", s.ServerID)
 		} else {
-			s.logger.Infof("Node %s lost leadership", s.raft)
+			s.logger.Infof("Node %s lost leadership", s.ServerID)
 		}
+		s.leaderChangeFn(isLeader)
 	}
 }
 

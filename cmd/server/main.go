@@ -1,17 +1,12 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 
+	cluster "github.com/kgantsov/dlock/cluster"
 	server "github.com/kgantsov/dlock/server"
 	"github.com/kgantsov/dlock/store"
 	"github.com/sirupsen/logrus"
@@ -58,56 +53,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	hosts := []string{}
-
-	if nodeID == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			fmt.Println("Error getting hostname:", err)
-			return
-		}
-
-		if ServiceName != "" {
-			service := fmt.Sprintf("%s-internal.default.svc.cluster.local", ServiceName)
-			_, addrs, err := net.LookupSRV("", "", service)
-			if err != nil {
-				log.Warningln("Error:", err)
-			}
-
-			for _, srv := range addrs {
-				if strings.HasPrefix(srv.Target, hostname) {
-					nodeID = srv.Target
-				} else {
-					hosts = append(hosts, srv.Target)
-				}
-
-			}
-
-			if strings.HasPrefix(nodeID, fmt.Sprintf("%s-0", ServiceName)) {
-				if len(hosts) >= 1 {
-					joinAddr = fmt.Sprintf("%s:%s", hosts[0], httpAddr)
-				}
-			} else {
-				joinAddr = fmt.Sprintf(
-					"%s-0.%s-internal.default.svc.cluster.local.:%s",
-					ServiceName,
-					ServiceName,
-					httpAddr,
-				)
-			}
-
-			raftAddr = fmt.Sprintf("%s:12000", nodeID)
-		}
-	}
-
-	log.Debugf(
-		"Current node is %s discovered hosts %+v joinAddr %s raftAddr %s",
-		nodeID,
-		hosts,
-		joinAddr,
-		raftAddr,
-	)
-
 	// Ensure Raft storage exists.
 	raftDir := flag.Arg(0)
 	if raftDir == "" {
@@ -120,6 +65,23 @@ func main() {
 	s := store.New(log, inmemory)
 	s.RaftDir = raftDir
 	s.RaftBind = raftAddr
+
+	var j *cluster.Joiner
+
+	if ServiceName != "" {
+		cl := cluster.NewCluster(log, "default", ServiceName, httpAddr)
+
+		if err := cl.Init(); err != nil {
+			log.Warningln("Error initialising a cluster:", err)
+			os.Exit(1)
+		}
+
+		nodeID = cl.NodeID()
+		joinAddr = cl.JoinAddr()
+
+		s.SetLeaderChangeFunc(cl.LeaderChanged)
+	}
+
 	if err := s.Open(true, nodeID); err != nil {
 		log.Fatalf("failed to open store: %s", err.Error())
 	}
@@ -133,8 +95,10 @@ func main() {
 
 	// If join was specified, make the join request.
 	if joinAddr != "" {
-		if err := join(log, joinAddr, raftAddr, nodeID); err != nil {
-			log.Fatalf("failed to join node at %s: %s", joinAddr, err.Error())
+		j = cluster.NewJoiner(log, nodeID, joinAddr, raftAddr)
+
+		if err := j.Join(); err != nil {
+			log.Fatal(err.Error())
 		}
 	}
 
@@ -145,28 +109,4 @@ func main() {
 	signal.Notify(terminate, os.Interrupt)
 	<-terminate
 	log.Info("hraftd exiting")
-}
-
-func join(log *logrus.Logger, joinAddr, raftAddr, nodeID string) error {
-	b, err := json.Marshal(map[string]string{"addr": raftAddr, "id": nodeID})
-	if err != nil {
-		return err
-	}
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/join", joinAddr), bytes.NewReader(b))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	log.Infof("JOINED %+v %+v", resp.StatusCode, string(body))
-	return nil
 }
