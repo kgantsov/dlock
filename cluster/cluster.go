@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/sirupsen/logrus"
@@ -152,8 +153,14 @@ func (c *Cluster) UpdateServiceEndpointSlice() error {
 	}
 
 	name := "http"
-	var port int32 = 80
 	ready := true
+	var port int32 = 80
+
+	i, err := strconv.ParseInt(c.httpAddr, 10, 32)
+	if err != nil {
+		return err
+	}
+	port = int32(i)
 
 	// Define the new EndpointSlice object
 	newEndpointSlice := &discoveryv1.EndpointSlice{
