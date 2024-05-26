@@ -1,7 +1,29 @@
 # dlock
 `dlock` is yet another distibuted lock based on the Raft consensus algorithm.
 
-The Raft consensus algorithm is a protocol for managing a replicated log across a distributed system to ensure consistency and reliability. Raft is designed to be understandable and practical, offering a robust solution to the consensus problem, which is fundamental for building fault-tolerant distributed systems. This means that the majority of nodes needs to agre on a value before acknowledging it and returning to a client.
+The Raft consensus algorithm is a protocol for managing a replicated log across a distributed system to ensure consistency and reliability. Raft is designed to be understandable and practical, offering a robust solution to the consensus problem, which is fundamental for building fault-tolerant distributed systems. 
+
+This means that the majority of nodes needs to agre on a value before acknowledging it and returning to a client, which is demostrated in the following diagram:
+
+```mermaid
+sequenceDiagram
+    Client->>Leader: Acquire "lock-1"
+    activate Leader
+    Leader->>Follower 1: Acquire "lock-1"
+    activate Follower 1
+    Leader->>Follower 2: Acquire "lock-1"
+    activate Follower 2
+    Leader->>Follower 3: Acquire "lock-1"
+    activate Follower 3
+    Follower 2-->>Leader: Acquired "lock-1"
+    deactivate Follower 2
+    Follower 3-->>Leader: Acquired "lock-1"
+    deactivate Follower 3
+    Leader-->>Client: Acquired "lock-1"
+    deactivate Leader
+    Follower 1-->>Leader: Acquired "lock-1"
+    deactivate Follower 1
+```
 
 
 ## Running dlock
