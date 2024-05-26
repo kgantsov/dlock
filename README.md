@@ -9,6 +9,7 @@ This means that the majority of nodes needs to agre on a value before acknowledg
 sequenceDiagram
     Client->>Leader: Acquire "lock-1"
     activate Leader
+    Leader->>Leader: Acquire "lock-1"
     Leader->>Follower 1: Acquire "lock-1"
     activate Follower 1
     Leader->>Follower 2: Acquire "lock-1"
@@ -98,6 +99,7 @@ sequenceDiagram
     Follower 2-->>Leader: Ack
     Note over Follower 1: Election timeout occured
     Note over Follower 1: Become a candidate
-    Follower 1->>Follower 2: Request votes
-    Follower 1->>Leader: Request votes
+    Follower 1->>Follower 1: Vote for itself
+    Follower 1->>Follower 2: Request vote
+    Follower 1->>Leader: Request vote
 ```
