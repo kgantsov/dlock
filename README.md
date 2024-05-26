@@ -69,8 +69,3 @@ Practical Considerations:
 Failures:
 
 The leader periodically sends heartbeat messages to all follower nodes to assert its leadership. So when the leader dies for some reason after some period (election timeout) other nodes will conclude that leader has failed and will start a new leader election.
-
-
-```mermaid
-
-```
