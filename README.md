@@ -13,12 +13,8 @@ sequenceDiagram
     activate Follower 1
     Leader->>Follower 2: Acquire "lock-1"
     activate Follower 2
-    Leader->>Follower 3: Acquire "lock-1"
-    activate Follower 3
     Follower 2-->>Leader: Acquired "lock-1"
     deactivate Follower 2
-    Follower 3-->>Leader: Acquired "lock-1"
-    deactivate Follower 3
     Leader-->>Client: Acquired "lock-1"
     deactivate Leader
     Follower 1-->>Leader: Acquired "lock-1"
@@ -88,6 +84,20 @@ Practical Considerations:
 - Resource Management: More nodes require more resources (e.g., CPU, memory, network bandwidth), so it's essential to balance fault tolerance with resource availability and costs.
 - Network Partitions: Ensure network reliability to minimize the chances of network partitions, which can prevent nodes from communicating and reaching a consensus.
 
-Failures:
+Node failure detection:
 
 The leader periodically sends heartbeat messages to all follower nodes to assert its leadership. So when the leader dies for some reason after some period (election timeout) other nodes will conclude that leader has failed and will start a new leader election.
+
+```mermaid
+sequenceDiagram
+    Leader->>Follower 1: Heartbeat & log replication
+    Note over Follower 1: Reset Timer
+    Follower 1-->>Leader: Ack
+    Leader->>Follower 2: Heartbeat & log replication
+    Note over Follower 2: Reset Timer
+    Follower 2-->>Leader: Ack
+    Note over Follower 1: Election timeout occured
+    Note over Follower 1: Become a candidate
+    Follower 1->>Follower 2: Request votes
+    Follower 1->>Leader: Request votes
+```
