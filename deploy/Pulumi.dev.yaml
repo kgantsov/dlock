@@ -1,0 +1,7 @@
+config:
+  dlock:namespace: default
+  dlock:replicas: "3"
+  dlock:image: "docker.coroutine.dev/dlock"
+  dlock:tag: "0.1.22"
+  dlock:ImagePullSecrets: "regcred"
+  dlock:httPort: "80"
