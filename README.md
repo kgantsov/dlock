@@ -46,6 +46,22 @@ Run other nodes
 
 You can find swagger docs by opening http://localhost:11000/docs
 
+
+## Deploying dlock to a kubernetes ckuster
+
+Deployments is implemented though the infrastructure as a code tool called [pulumi](https://www.pulumi.com/) and the deployment code is located under a `deploy` folder.
+
+To deployt dlock to your kubernetes cluster you need to run `pulumi up` inside the `deploy` folder and follow the interactive instructions provided by pulumi.
+
+```bash
+cd deploy
+pulumi up
+```
+It will take a few minutes for pulumi to create all the necessary kubernetes resources.
+
+A statefulset with 3 pods by default will be created as well as two different services. The first service `dlock-internal` is a headless and allows nodes to find eachother and form a cluster automatically. As the name suggests `dlock-internal` service should not be used by `dlock` clients, instead the second `dlock` service clients should connect to. The biggest difference between the two is that `dlock-internal` service will contain all the pods regardless if they are in the leader or in the follower state. On the other hand `dlock` will only point to a leader pod. In case the leader dies the election process will kick in by one of the followers and when the follower is promoted to a leader the `dlock` service will be updated and will point to this new leader pod.
+
+
 ## Acquiring and releasing locks
 
 To acquire a lock run
