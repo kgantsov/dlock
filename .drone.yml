@@ -9,8 +9,8 @@ steps:
       from_secret: docker_username
     password:
       from_secret: docker_password
-    repo: docker.coroutine.dev/dlock
+    repo: kgantsov/dlock
     context: .
     dockerfile: ./Dockerfile
-    registry: docker.coroutine.dev
+    registry: hub.docker.com
     auto_tag: true
