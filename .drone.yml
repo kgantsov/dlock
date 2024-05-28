@@ -12,5 +12,4 @@ steps:
     repo: kgantsov/dlock
     context: .
     dockerfile: ./Dockerfile
-    registry: hub.docker.com
     auto_tag: true
