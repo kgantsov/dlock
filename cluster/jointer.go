@@ -15,17 +15,15 @@ import (
 type Joiner struct {
 	nodeID   string
 	raftAddr string
-	httpAddr string
 	hosts    []string
 
 	logger *logrus.Logger
 }
 
-func NewJoiner(logger *logrus.Logger, nodeID, raftAddr, httpAddr string, hosts []string) *Joiner {
+func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *Joiner {
 	j := &Joiner{
 		nodeID:   nodeID,
 		raftAddr: raftAddr,
-		httpAddr: httpAddr,
 		hosts:    hosts,
 
 		logger: logger,
@@ -45,8 +43,6 @@ func (j *Joiner) Join() error {
 
 	for i := 0; i < 3; i++ {
 		for _, host = range j.hosts {
-			host = fmt.Sprintf("%s:%s", host, j.httpAddr)
-
 			j.logger.Debugf("Trying to join: %s", host)
 
 			if err = j.join(host, j.raftAddr, j.nodeID); err == nil {

@@ -40,8 +40,8 @@ Run the first node
 Run other nodes
 
 ```bash
-./dlock -id node1 -haddr 11001 -raddr localhost:12001 -join :11000 ./data/node1
-./dlock -id node2 -haddr 11002 -raddr localhost:12002 -join :11000 ./data/node2
+./dlock -id node1 -haddr 11001 -raddr localhost:12001 -join localhost:11000 ./data/node1
+./dlock -id node2 -haddr 11002 -raddr localhost:12002 -join localhost:11000 ./data/node2
 ```
 
 You can find swagger docs by opening http://localhost:11000/docs

@@ -77,7 +77,7 @@ func (c *Cluster) Init() error {
 		if strings.HasPrefix(srv.Target, c.hostname) {
 			c.nodeID = srv.Target
 		} else {
-			c.hosts = append(c.hosts, srv.Target)
+			c.hosts = append(c.hosts, fmt.Sprintf("%s:%s", srv.Target, c.httpAddr))
 		}
 
 	}
