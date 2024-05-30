@@ -6,6 +6,7 @@ import (
 	"io"
 
 	"github.com/hashicorp/raft"
+	badgerdb "github.com/kgantsov/dlock/badger-store"
 )
 
 type FSM Store
@@ -37,46 +38,61 @@ func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	// Clone the map.
-	o := make(map[string]bool)
-	for k, v := range f.m {
-		o[k] = v
-	}
-	return &FSMSnapshot{store: o}, nil
+	snapshot := &FSMSnapshot{path: f.store.DBPath(), store: f.store}
+	return snapshot, nil
 }
 
 // Restore stores the key-value store to a previous state.
 func (f *FSM) Restore(rc io.ReadCloser) error {
-	o := make(map[string]bool)
-	if err := json.NewDecoder(rc).Decode(&o); err != nil {
+	defer rc.Close()
+
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	// Close the current database
+	if err := f.store.Close(); err != nil {
 		return err
 	}
 
-	// Set the state from the snapshot, no lock required according to
-	// Hashicorp docs.
-	f.m = o
+	newDB, err := badgerdb.New(badgerdb.Options{
+		Path: f.store.DBPath(),
+	})
+	if err != nil {
+		return err
+	}
+
+	f.store = newDB
+
 	return nil
 }
 
 func (f *FSM) applyAcquire(key string) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	val := f.m[key]
 
-	if val {
+	err := f.store.Acquire([]byte(key), []byte("1"))
+
+	if err != nil {
 		return &FSMResponse{
 			key:   key,
 			error: fmt.Errorf("Failed to acquire a lock for a key: %s", key),
 		}
 	}
 
-	f.m[key] = true
 	return &FSMResponse{key: key, error: nil}
 }
 
 func (f *FSM) applyRelease(key string) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	delete(f.m, key)
+
+	err := f.store.Release([]byte(key))
+
+	if err != nil {
+		return &FSMResponse{
+			key:   key,
+			error: fmt.Errorf("Failed to release a lock for a key: %s", key),
+		}
+	}
 	return &FSMResponse{key: key, error: nil}
 }

@@ -37,8 +37,8 @@ type Store struct {
 	inmemory bool
 	ServerID raft.ServerID
 
-	mu sync.Mutex
-	m  map[string]bool // The key-value store for the system.
+	mu    sync.Mutex
+	store *badgerdb.BadgerStore
 
 	leaderChangeFn func(bool)
 
@@ -50,7 +50,6 @@ type Store struct {
 // New returns a new Store.
 func New(logger *logrus.Logger, inmemory bool) *Store {
 	return &Store{
-		m:              make(map[string]bool),
 		inmemory:       inmemory,
 		logger:         logger,
 		leaderChangeFn: func(bool) {},
@@ -101,6 +100,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 		}
 		logStore = badgerDB
 		stableStore = badgerDB
+		s.store = badgerDB
 	}
 
 	// Instantiate the Raft systems.

@@ -2,6 +2,7 @@ package badgerstore
 
 import (
 	"errors"
+	"io"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
@@ -17,9 +18,12 @@ var (
 	// Bucket names we perform transactions in
 	dbLogs = []byte("logs")
 	dbConf = []byte("conf")
+	dbLock = []byte("lock")
 
 	// An error indicating a given key does not exist
-	ErrKeyNotFound = errors.New("not found")
+	ErrKeyNotFound          = errors.New("not found")
+	ErrNotAbleToAcquireLock = errors.New("Not able to acquire a lock")
+	ErrNotAbleToReleaseLock = errors.New("Not able to release a lock")
 )
 
 // BadgerStore provides access to Badger for Raft to store and retrieve
@@ -215,33 +219,60 @@ func (b *BadgerStore) StoreLogs(logs []*raft.Log) error {
 
 // DeleteRange is used to delete logs within a given range inclusively.
 func (b *BadgerStore) DeleteRange(min, max uint64) error {
-	txn := b.db.NewTransaction(true)
-	defer txn.Discard()
+	batchSize := 100 // Adjust the batch size as needed
 
 	opts := badger.DefaultIteratorOptions
 	opts.PrefetchSize = 10
 
-	it := txn.NewIterator(opts)
-
+	// Convert min to the prefixed byte array
 	minKey := addPrefix(dbLogs, uint64ToBytes(min))
 
-	for it.Seek(minKey); it.ValidForPrefix(dbLogs); it.Next() {
-		item := it.Item()
-		k := item.Key()
+	for {
+		txn := b.db.NewTransaction(true)
+		it := txn.NewIterator(opts)
 
-		if bytesToUint64(k[len(dbLogs):]) > max {
+		count := 0
+		var lastKey []byte
+
+		for it.Seek(minKey); it.ValidForPrefix(dbLogs); it.Next() {
+			item := it.Item()
+			k := item.Key()
+			lastKey = append([]byte{}, k...)
+
+			if bytesToUint64(k[len(dbLogs):]) > max {
+				break
+			}
+
+			if err := txn.Delete(k); err != nil {
+				it.Close()
+				txn.Discard()
+				return err
+			}
+
+			count++
+			if count >= batchSize {
+				break
+			}
+		}
+
+		it.Close()
+
+		if count == 0 {
+			// No more items to delete
+			txn.Discard()
 			break
 		}
 
-		if err := txn.Delete(k); err != nil {
+		// Commit the current transaction
+		if err := txn.Commit(); err != nil {
 			return err
 		}
 
+		// Set the minKey for the next batch to be the lastKey + 1
+		minKey = append(lastKey, 0)
 	}
 
-	it.Close()
-
-	return txn.Commit()
+	return nil
 }
 
 // Set is used to set a key/value set outside of the raft log
@@ -274,6 +305,36 @@ func (b *BadgerStore) Get(k []byte) ([]byte, error) {
 	return append([]byte(nil), val...), nil
 }
 
+// Set is used to set a key/value set outside of the raft log
+func (b *BadgerStore) Acquire(k, v []byte) error {
+	txn := b.db.NewTransaction(true)
+	defer txn.Discard()
+
+	_, err := txn.Get(addPrefix(dbLock, k))
+	if err != badger.ErrKeyNotFound {
+		return ErrNotAbleToAcquireLock
+	}
+
+	if err := txn.Set(addPrefix(dbLock, k), v); err != nil {
+		return err
+	}
+
+	return txn.Commit()
+}
+
+// Get is used to retrieve a value from the k/v store by key
+func (b *BadgerStore) Release(k []byte) error {
+	txn := b.db.NewTransaction(true)
+	defer txn.Discard()
+
+	err := txn.Delete(addPrefix(dbLock, k))
+	if err != nil {
+		return ErrNotAbleToReleaseLock
+	}
+
+	return txn.Commit()
+}
+
 // SetUint64 is like Set, but handles uint64 values
 func (b *BadgerStore) SetUint64(key []byte, val uint64) error {
 	return b.Set(key, uint64ToBytes(val))
@@ -286,4 +347,14 @@ func (b *BadgerStore) GetUint64(key []byte) (uint64, error) {
 		return 0, err
 	}
 	return bytesToUint64(val), nil
+}
+
+// DBPath returns a path to a DB file
+func (b *BadgerStore) DBPath() string {
+	return b.path
+}
+
+// StoreLog is used to store a single raft log
+func (b *BadgerStore) Backup(w io.Writer, since uint64) (uint64, error) {
+	return b.db.Backup(w, since)
 }

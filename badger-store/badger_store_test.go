@@ -291,3 +291,29 @@ func TestBadgerStore_SetUint64_GetUint64(t *testing.T) {
 		t.Fatalf("bad: %v", val)
 	}
 }
+
+func TestBadgerStore_Acquire_Release(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != nil {
+		t.Fatalf("expected not found error, got: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != ErrNotAbleToAcquireLock {
+		t.Fatalf("expected not found error, got: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:2"), []byte("1")); err != nil {
+		t.Fatalf("expected not found error, got: %q", err)
+	}
+
+	if err := store.Release([]byte("my-lock:1")); err != nil {
+		t.Fatalf("expected not found error, got: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != nil {
+		t.Fatalf("expected not found error, got: %q", err)
+	}
+}
