@@ -40,22 +40,12 @@ func main() {
 			"app": pulumi.String(name),
 		}
 
-		// Create a new namespace
-		namespace, err := corev1.NewNamespace(ctx, fmt.Sprintf("%sns", name), &corev1.NamespaceArgs{
-			Metadata: &metav1.ObjectMetaArgs{
-				Name: pulumi.String(k8sNamespace),
-			},
-		})
-		if err != nil {
-			return err
-		}
-
 		roleName := fmt.Sprintf("%s-endpointslice-creator", name)
 
 		// Create a Role
 		_, err = rbacv1.NewRole(ctx, roleName, &rbacv1.RoleArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 				Name:      pulumi.String(roleName),
 			},
 			Rules: rbacv1.PolicyRuleArray{
@@ -84,21 +74,21 @@ func main() {
 		corev1.NewServiceAccount(ctx, name, &corev1.ServiceAccountArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String(name),
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 			},
 		})
 
 		// Create a RoleBinding
 		_, err = rbacv1.NewRoleBinding(ctx, fmt.Sprintf("%s-endpointslice-creator-binding", name), &rbacv1.RoleBindingArgs{
 			Metadata: &metav1.ObjectMetaArgs{
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 				Name:      pulumi.String(fmt.Sprintf("%s-endpointslice-creator-binding", name)),
 			},
 			Subjects: rbacv1.SubjectArray{
 				&rbacv1.SubjectArgs{
 					Kind:      pulumi.String("ServiceAccount"),
 					Name:      pulumi.String(name),
-					Namespace: namespace.Metadata.Name(),
+					Namespace: pulumi.String(k8sNamespace),
 				},
 			},
 			RoleRef: &rbacv1.RoleRefArgs{
@@ -115,7 +105,7 @@ func main() {
 		statefulSet, err := appsv1.NewStatefulSet(ctx, name, &appsv1.StatefulSetArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String(name),
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 			},
 			Spec: &appsv1.StatefulSetSpecArgs{
 				ServiceName: pulumi.String(fmt.Sprintf("%s-internal", name)),
@@ -188,7 +178,7 @@ func main() {
 		serviceInternal, err := corev1.NewService(ctx, fmt.Sprintf("%s-internal", name), &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String(fmt.Sprintf("%s-internal", name)),
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 				// Labels:    pulumi.StringMap(appLabels),
 			},
 			Spec: &corev1.ServiceSpecArgs{
@@ -213,7 +203,7 @@ func main() {
 		service, err := corev1.NewService(ctx, name, &corev1.ServiceArgs{
 			Metadata: &metav1.ObjectMetaArgs{
 				Name:      pulumi.String(name),
-				Namespace: namespace.Metadata.Name(),
+				Namespace: pulumi.String(k8sNamespace),
 				Labels:    pulumi.StringMap(appLabels),
 			},
 			Spec: &corev1.ServiceSpecArgs{
