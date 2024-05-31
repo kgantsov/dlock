@@ -21,7 +21,7 @@ import (
 // Store is the interface Raft-backed key-value stores must implement.
 type Store interface {
 	// Acquire acquires a lock the given key if it wasn't acquired by somebody else.
-	Acquire(key string) error
+	Acquire(key string, ttl int) error
 
 	// Release releases a lock for the given key.
 	Release(key string) error

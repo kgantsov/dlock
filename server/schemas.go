@@ -15,7 +15,10 @@ type JoinOutput struct {
 }
 
 type AcquireInput struct {
-	Key string `path:"key" maxLength:"1024" example:"migration_lock:1" doc:"Key for the lock"`
+	Key  string `path:"key" maxLength:"1024" example:"migration_lock:1" doc:"Key for the lock"`
+	Body struct {
+		TTL int `json:"ttl" minimum:1 example:60 doc:"Time to live for the lock in seconds"`
+	}
 }
 
 type AcquireOutput struct {

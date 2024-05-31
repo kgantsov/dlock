@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/hashicorp/raft"
 	badgerdb "github.com/kgantsov/dlock/badger-store"
@@ -25,7 +26,7 @@ func (f *FSM) Apply(l *raft.Log) interface{} {
 
 	switch c.Op {
 	case "acquire":
-		return f.applyAcquire(c.Key)
+		return f.applyAcquire(c.Key, c.Time)
 	case "release":
 		return f.applyRelease(c.Key)
 	default:
@@ -66,11 +67,21 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	return nil
 }
 
-func (f *FSM) applyAcquire(key string) interface{} {
+func (f *FSM) applyAcquire(key, expireAt string) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	err := f.store.Acquire([]byte(key), []byte("1"))
+	expire, err := time.Parse(time.RFC3339, expireAt)
+	if err != nil {
+		return &FSMResponse{
+			key: key,
+			error: fmt.Errorf(
+				"Failed to parse expirition time for a lock for a key: %s %s", key, expireAt,
+			),
+		}
+	}
+
+	err = f.store.Acquire([]byte(key), expire)
 
 	if err != nil {
 		return &FSMResponse{

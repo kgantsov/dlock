@@ -30,8 +30,9 @@ func (h *Handler) Join(ctx context.Context, input *JoinInput) (*JoinOutput, erro
 
 func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOutput, error) {
 	key := input.Key
+	ttl := input.Body.TTL
 
-	if err := h.store.Acquire(key); err != nil {
+	if err := h.store.Acquire(key, ttl); err != nil {
 		return nil, huma.Error409Conflict("Failed to acquire a lock", err)
 	}
 

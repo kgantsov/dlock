@@ -5,6 +5,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/raft"
 )
@@ -297,23 +298,43 @@ func TestBadgerStore_Acquire_Release(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != nil {
-		t.Fatalf("expected not found error, got: %q", err)
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
 	}
 
-	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != ErrNotAbleToAcquireLock {
-		t.Fatalf("expected not found error, got: %q", err)
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != ErrNotAbleToAcquireLock {
+		t.Fatalf("expected ErrNotAbleToAcquireLock error, got: %q", err)
 	}
 
-	if err := store.Acquire([]byte("my-lock:2"), []byte("1")); err != nil {
-		t.Fatalf("expected not found error, got: %q", err)
+	if err := store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
 	}
 
 	if err := store.Release([]byte("my-lock:1")); err != nil {
-		t.Fatalf("expected not found error, got: %q", err)
+		t.Fatalf("expected to release a lock, got: %q", err)
 	}
 
-	if err := store.Acquire([]byte("my-lock:1"), []byte("1")); err != nil {
-		t.Fatalf("expected not found error, got: %q", err)
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
+	}
+}
+
+func TestBadgerStore_Acquire_Release_WithTTL(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != ErrNotAbleToAcquireLock {
+		t.Fatalf("expected ErrNotAbleToAcquireLock error, got: %q", err)
+	}
+
+	time.Sleep(1 * time.Second)
+
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
 	}
 }

@@ -3,6 +3,7 @@ package badgerstore
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
@@ -306,16 +307,32 @@ func (b *BadgerStore) Get(k []byte) ([]byte, error) {
 }
 
 // Set is used to set a key/value set outside of the raft log
-func (b *BadgerStore) Acquire(k, v []byte) error {
+func (b *BadgerStore) Acquire(k []byte, expireAt time.Time) error {
 	txn := b.db.NewTransaction(true)
 	defer txn.Discard()
 
-	_, err := txn.Get(addPrefix(dbLock, k))
-	if err != badger.ErrKeyNotFound {
-		return ErrNotAbleToAcquireLock
+	item, err := txn.Get(addPrefix(dbLock, k))
+	if err != nil {
+		if err != badger.ErrKeyNotFound {
+			return err
+		}
+	} else {
+		val, err := item.ValueCopy(nil)
+
+		if err == nil {
+			var valueExpireAt time.Time
+			err = valueExpireAt.UnmarshalBinary(val)
+
+			if err == nil {
+				if time.Now().Before(valueExpireAt) {
+					return ErrNotAbleToAcquireLock
+				}
+			}
+		}
 	}
 
-	if err := txn.Set(addPrefix(dbLock, k), v); err != nil {
+	expireInBytes, _ := expireAt.MarshalBinary()
+	if err := txn.Set(addPrefix(dbLock, k), expireInBytes); err != nil {
 		return err
 	}
 
