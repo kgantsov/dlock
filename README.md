@@ -70,7 +70,7 @@ To acquire a lock that have `my-lock-name` name which expires in 60 seconds run:
 curl --request POST \
   --url http://localhost:11000/API/v1/locks/my-lock-name \
   --header 'Accept: application/json' \
-  --header 'Content-Type: application/json'
+  --header 'Content-Type: application/json' \
   --data '{"ttl": 60}'
 ```
 
