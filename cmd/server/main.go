@@ -64,6 +64,7 @@ func main() {
 
 	s := store.New(log, inmemory)
 	s.RaftDir = raftDir
+	s.RunValueLogGC()
 
 	var j *cluster.Joiner
 

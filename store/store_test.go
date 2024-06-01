@@ -95,18 +95,18 @@ func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
 	// Simple way to ensure there is a leader.
 	time.Sleep(3 * time.Second)
 
-	if err := s.Acquire("foo", 1); err != nil {
+	if err := s.Acquire("foo", 2); err != nil {
 		t.Fatalf("failed to acquire a clock for a key: %s", err.Error())
 	}
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err := s.Acquire("foo", 1)
+	err := s.Acquire("foo", 2)
 	if err == nil {
 		t.Fatal("Managed to acquire already acquired lock")
 	}
-	time.Sleep(1 * time.Second)
-	if err := s.Acquire("foo", 1); err != nil {
+	time.Sleep(2 * time.Second)
+	if err := s.Acquire("foo", 2); err != nil {
 		t.Fatalf("failed to acquire a clock for a key: %s", err.Error())
 	}
 }

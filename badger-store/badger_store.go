@@ -332,7 +332,8 @@ func (b *BadgerStore) Acquire(k []byte, expireAt time.Time) error {
 	}
 
 	expireInBytes, _ := expireAt.MarshalBinary()
-	if err := txn.Set(addPrefix(dbLock, k), expireInBytes); err != nil {
+	e := badger.NewEntry(addPrefix(dbLock, k), expireInBytes).WithTTL(expireAt.Sub(time.Now().UTC()))
+	if err := txn.SetEntry(e); err != nil {
 		return err
 	}
 
@@ -374,4 +375,8 @@ func (b *BadgerStore) DBPath() string {
 // StoreLog is used to store a single raft log
 func (b *BadgerStore) Backup(w io.Writer, since uint64) (uint64, error) {
 	return b.db.Backup(w, since)
+}
+
+func (b *BadgerStore) RunValueLogGC(discardRatio float64) error {
+	return b.db.RunValueLogGC(discardRatio)
 }

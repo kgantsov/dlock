@@ -232,3 +232,17 @@ func (s *Store) Join(nodeID, addr string) error {
 	s.logger.Infof("node %s at %s joined successfully", nodeID, addr)
 	return nil
 }
+
+func (s *Store) RunValueLogGC() {
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+		again:
+			err := s.store.RunValueLogGC(0.7)
+			if err == nil {
+				goto again
+			}
+		}
+	}()
+}
