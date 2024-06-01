@@ -26,8 +26,9 @@ const (
 )
 
 type command struct {
-	Op  string `json:"op,omitempty"`
-	Key string `json:"key,omitempty"`
+	Op   string `json:"op,omitempty"`
+	Key  string `json:"name,omitempty"`
+	Time string `json:"time,omitempty"`
 }
 
 // Store is a simple key-value store, where all changes are made via Raft consensus.
@@ -139,14 +140,15 @@ func (s *Store) ListenToLeaderChanges() {
 }
 
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
-func (s *Store) Acquire(key string) error {
+func (s *Store) Acquire(key string, ttl int) error {
 	if s.raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
 
 	c := &command{
-		Op:  "acquire",
-		Key: key,
+		Op:   "acquire",
+		Key:  key,
+		Time: time.Now().UTC().Add(time.Second * time.Duration(ttl)).Format(time.RFC3339),
 	}
 	b, err := json.Marshal(c)
 	if err != nil {
@@ -229,4 +231,23 @@ func (s *Store) Join(nodeID, addr string) error {
 	}
 	s.logger.Infof("node %s at %s joined successfully", nodeID, addr)
 	return nil
+}
+
+func (s *Store) RunValueLogGC() {
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+
+		s.logger.Debug("Started running value GC")
+
+		for range ticker.C {
+			locks := s.store.Locks()
+			s.logger.Debugf("Running value GC. Locks found: %d", len(locks))
+		again:
+			err := s.store.RunValueLogGC(0.7)
+			if err == nil {
+				goto again
+			}
+		}
+	}()
 }

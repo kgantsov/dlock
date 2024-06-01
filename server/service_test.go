@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/sirupsen/logrus"
@@ -34,7 +35,9 @@ func TestLock(t *testing.T) {
 		Detail string `json:"detail"`
 	}
 
-	resp := api.Post("/API/v1/locks/migration_lock")
+	resp := api.Post("/API/v1/locks/migration_lock", map[string]any{
+		"ttl": 5,
+	})
 
 	successOutput := &SuccessOutput{}
 
@@ -43,7 +46,9 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Equal(t, successOutput.Status, "ACQUIRED")
 
-	resp = api.Post("/API/v1/locks/another_lock")
+	resp = api.Post("/API/v1/locks/another_lock", map[string]any{
+		"ttl": 5,
+	})
 
 	successOutput = &SuccessOutput{}
 
@@ -52,7 +57,9 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Equal(t, successOutput.Status, "ACQUIRED")
 
-	resp = api.Post("/API/v1/locks/migration_lock")
+	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
+		"ttl": 5,
+	})
 
 	errorOutput := &ErrorOutput{}
 
@@ -72,7 +79,9 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Equal(t, successOutput.Status, "RELEASED")
 
-	resp = api.Post("/API/v1/locks/migration_lock")
+	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
+		"ttl": 0,
+	})
 
 	successOutput = &SuccessOutput{}
 
@@ -83,23 +92,23 @@ func TestLock(t *testing.T) {
 }
 
 type testStore struct {
-	m map[string]bool
+	m map[string]time.Time
 }
 
 func newTestStore() *testStore {
 	return &testStore{
-		m: make(map[string]bool),
+		m: make(map[string]time.Time),
 	}
 }
 
-func (t *testStore) Acquire(key string) error {
-	val := t.m[key]
+func (t *testStore) Acquire(key string, ttl int) error {
+	_, ok := t.m[key]
 
-	if val {
+	if ok {
 		return fmt.Errorf("Failed to acquire a lock for a key: %s", key)
 	}
 
-	t.m[key] = true
+	t.m[key] = time.Now().UTC().Add(time.Second * time.Duration(ttl))
 	return nil
 }
 

@@ -3,6 +3,7 @@ package badgerstore
 import (
 	"errors"
 	"io"
+	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
@@ -306,16 +307,33 @@ func (b *BadgerStore) Get(k []byte) ([]byte, error) {
 }
 
 // Set is used to set a key/value set outside of the raft log
-func (b *BadgerStore) Acquire(k, v []byte) error {
+func (b *BadgerStore) Acquire(k []byte, expireAt time.Time) error {
 	txn := b.db.NewTransaction(true)
 	defer txn.Discard()
 
-	_, err := txn.Get(addPrefix(dbLock, k))
-	if err != badger.ErrKeyNotFound {
-		return ErrNotAbleToAcquireLock
+	item, err := txn.Get(addPrefix(dbLock, k))
+	if err != nil {
+		if err != badger.ErrKeyNotFound {
+			return err
+		}
+	} else {
+		val, err := item.ValueCopy(nil)
+
+		if err == nil {
+			var valueExpireAt time.Time
+			err = valueExpireAt.UnmarshalBinary(val)
+
+			if err == nil {
+				if time.Now().Before(valueExpireAt) {
+					return ErrNotAbleToAcquireLock
+				}
+			}
+		}
 	}
 
-	if err := txn.Set(addPrefix(dbLock, k), v); err != nil {
+	expireInBytes, _ := expireAt.MarshalBinary()
+	e := badger.NewEntry(addPrefix(dbLock, k), expireInBytes).WithTTL(expireAt.Sub(time.Now().UTC()))
+	if err := txn.SetEntry(e); err != nil {
 		return err
 	}
 
@@ -357,4 +375,36 @@ func (b *BadgerStore) DBPath() string {
 // StoreLog is used to store a single raft log
 func (b *BadgerStore) Backup(w io.Writer, since uint64) (uint64, error) {
 	return b.db.Backup(w, since)
+}
+
+func (b *BadgerStore) RunValueLogGC(discardRatio float64) error {
+	return b.db.RunValueLogGC(discardRatio)
+}
+
+func (b *BadgerStore) Size() (lsm, vlog int64) {
+	return b.db.Size()
+}
+
+func (b *BadgerStore) Locks() []string {
+	txn := b.db.NewTransaction(false)
+	defer txn.Discard()
+
+	keys := []string{}
+
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchSize = 10
+	opts.PrefetchValues = false
+
+	it := txn.NewIterator(opts)
+	defer it.Close()
+	prefix := []byte(dbLock)
+
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+		key := item.Key()
+
+		keys = append(keys, string(key))
+	}
+
+	return keys
 }
