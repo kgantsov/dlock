@@ -380,3 +380,31 @@ func (b *BadgerStore) Backup(w io.Writer, since uint64) (uint64, error) {
 func (b *BadgerStore) RunValueLogGC(discardRatio float64) error {
 	return b.db.RunValueLogGC(discardRatio)
 }
+
+func (b *BadgerStore) Size() (lsm, vlog int64) {
+	return b.db.Size()
+}
+
+func (b *BadgerStore) Locks() []string {
+	txn := b.db.NewTransaction(false)
+	defer txn.Discard()
+
+	keys := []string{}
+
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchSize = 10
+	opts.PrefetchValues = false
+
+	it := txn.NewIterator(opts)
+	defer it.Close()
+	prefix := []byte(dbLock)
+
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+		key := item.Key()
+
+		keys = append(keys, string(key))
+	}
+
+	return keys
+}
