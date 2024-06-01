@@ -64,13 +64,14 @@ A statefulset with 3 pods by default will be created as well as two different se
 
 ## Acquiring and releasing locks
 
-To acquire a lock run
+To acquire a lock that have `my-lock-name` name which expires in 60 seconds run:
 
 ```bash
 curl --request POST \
   --url http://localhost:11000/API/v1/locks/my-lock-name \
   --header 'Accept: application/json' \
   --header 'Content-Type: application/json'
+  --data '{"ttl": 60}'
 ```
 
 To release a lock run
