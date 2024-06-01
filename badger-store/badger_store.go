@@ -103,20 +103,6 @@ func (b *BadgerStore) Close() error {
 }
 
 // FirstIndex returns the first known index from the Raft log.
-// func (b *BadgerStore) FirstIndex() (uint64, error) {
-// 	tx, err := b.db.Begin(false)
-// 	if err != nil {
-// 		return 0, err
-// 	}
-// 	defer tx.Rollback()
-
-//		curs := tx.Bucket(dbLogs).Cursor()
-//		if first, _ := curs.First(); first == nil {
-//			return 0, nil
-//		} else {
-//			return bytesToUint64(first), nil
-//		}
-//	}
 func (b *BadgerStore) FirstIndex() (uint64, error) {
 	txn := b.db.NewTransaction(false)
 	defer txn.Discard()
@@ -187,7 +173,7 @@ func (b *BadgerStore) GetLog(idx uint64, log *raft.Log) error {
 
 	val, err := item.ValueCopy(nil)
 
-	if val == nil {
+	if val == nil || err != nil {
 		return raft.ErrLogNotFound
 	}
 	return decodeMsgPack(val, log)
@@ -345,7 +331,12 @@ func (b *BadgerStore) Release(k []byte) error {
 	txn := b.db.NewTransaction(true)
 	defer txn.Discard()
 
-	err := txn.Delete(addPrefix(dbLock, k))
+	_, err := txn.Get(addPrefix(dbLock, k))
+	if err != nil {
+		return ErrNotAbleToReleaseLock
+	}
+
+	err = txn.Delete(addPrefix(dbLock, k))
 	if err != nil {
 		return ErrNotAbleToReleaseLock
 	}

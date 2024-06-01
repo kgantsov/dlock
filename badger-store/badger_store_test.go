@@ -338,3 +338,38 @@ func TestBadgerStore_Acquire_Release_WithTTL(t *testing.T) {
 		t.Fatalf("expected to acquire a lock, got error: %q", err)
 	}
 }
+
+// TestDBPath tests that the DBPath method returns the correct path
+func TestDBPath(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	if store.DBPath() != store.path {
+		t.Fatalf("bad path: %s", store.DBPath())
+	}
+}
+
+func TestBadgerStore_Locks(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
+	}
+
+	if err := store.Acquire([]byte("my-lock:3"), time.Now().UTC().Add(time.Second*1)); err != nil {
+		t.Fatalf("expected to acquire a lock, got error: %q", err)
+	}
+
+	locks := store.Locks()
+
+	if len(locks) != 3 {
+		t.Fatalf("expected to get 3 locks, got %d", len(locks))
+	}
+}

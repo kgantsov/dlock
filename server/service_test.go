@@ -91,6 +91,81 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, successOutput.Status, "ACQUIRED")
 }
 
+// TestRelease tests the release endpoint with the lock that is not qcuired.
+func TestRelease(t *testing.T) {
+	_, api := humatest.New(t)
+
+	log := logrus.New()
+	log.SetLevel(logrus.InfoLevel)
+
+	store := newTestStore()
+
+	h := &Handler{
+		store:  store,
+		Logger: log,
+	}
+	h.RegisterRoutes(api)
+
+	type SuccessOutput struct {
+		Status string `json:"status"`
+	}
+	type ErrorOutput struct {
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+	}
+
+	resp := api.Delete("/API/v1/locks/non_existing_lock")
+
+	errorOutput := &ErrorOutput{}
+
+	json.Unmarshal(resp.Body.Bytes(), errorOutput)
+
+	assert.Equal(t, http.StatusBadRequest, resp.Code)
+	assert.Equal(t, errorOutput.Title, "Bad Request")
+	assert.Equal(t, errorOutput.Status, 400)
+	assert.Equal(t, errorOutput.Detail, "Failed to release a lock")
+}
+
+// TestJoin tests the join endpoint.
+func TestJoin(t *testing.T) {
+	_, api := humatest.New(t)
+
+	log := logrus.New()
+	log.SetLevel(logrus.InfoLevel)
+
+	store := newTestStore()
+
+	h := &Handler{
+		store:  store,
+		Logger: log,
+	}
+	h.RegisterRoutes(api)
+
+	type SuccessOutput struct {
+		ID   string `json:"id"`
+		Addr string `json:"addr"`
+	}
+	type ErrorOutput struct {
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+	}
+
+	resp := api.Post("/join", map[string]any{
+		"id":   "dlock-node-0",
+		"addr": "localhost:12001",
+	})
+
+	successOutput := &SuccessOutput{}
+
+	json.Unmarshal(resp.Body.Bytes(), successOutput)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, successOutput.ID, "dlock-node-0")
+	assert.Equal(t, successOutput.Addr, "localhost:12001")
+}
+
 type testStore struct {
 	m map[string]time.Time
 }
@@ -113,6 +188,12 @@ func (t *testStore) Acquire(key string, ttl int) error {
 }
 
 func (t *testStore) Release(key string) error {
+	_, ok := t.m[key]
+
+	if !ok {
+		return fmt.Errorf("Failed to release a lock for a key: %s", key)
+	}
+
 	delete(t.m, key)
 	return nil
 }
