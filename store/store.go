@@ -235,7 +235,7 @@ func (s *Store) Join(nodeID, addr string) error {
 
 func (s *Store) RunValueLogGC() {
 	go func() {
-		ticker := time.NewTicker(1 * time.Minute)
+		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 
 		s.logger.Debug("Started running value GC")
