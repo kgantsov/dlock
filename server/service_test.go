@@ -44,7 +44,7 @@ func TestLock(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, successOutput.Status, "ACQUIRED")
+	assert.Equal(t, "ACQUIRED", successOutput.Status)
 
 	resp = api.Post("/API/v1/locks/another_lock", map[string]any{
 		"ttl": 5,
@@ -55,7 +55,7 @@ func TestLock(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, successOutput.Status, "ACQUIRED")
+	assert.Equal(t, "ACQUIRED", successOutput.Status)
 
 	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
 		"ttl": 5,
@@ -66,9 +66,9 @@ func TestLock(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), errorOutput)
 
 	assert.Equal(t, http.StatusConflict, resp.Code)
-	assert.Equal(t, errorOutput.Title, "Conflict")
-	assert.Equal(t, errorOutput.Status, 409)
-	assert.Equal(t, errorOutput.Detail, "Failed to acquire a lock")
+	assert.Equal(t, "Conflict", errorOutput.Title)
+	assert.Equal(t, 409, errorOutput.Status)
+	assert.Equal(t, "Failed to acquire a lock", errorOutput.Detail)
 
 	resp = api.Delete("/API/v1/locks/migration_lock")
 
@@ -77,7 +77,7 @@ func TestLock(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, successOutput.Status, "RELEASED")
+	assert.Equal(t, "RELEASED", successOutput.Status)
 
 	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
 		"ttl": 0,
@@ -88,7 +88,7 @@ func TestLock(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, successOutput.Status, "ACQUIRED")
+	assert.Equal(t, "ACQUIRED", successOutput.Status)
 }
 
 // TestRelease tests the release endpoint with the lock that is not qcuired.
@@ -122,9 +122,9 @@ func TestRelease(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), errorOutput)
 
 	assert.Equal(t, http.StatusBadRequest, resp.Code)
-	assert.Equal(t, errorOutput.Title, "Bad Request")
-	assert.Equal(t, errorOutput.Status, 400)
-	assert.Equal(t, errorOutput.Detail, "Failed to release a lock")
+	assert.Equal(t, "Bad Request", errorOutput.Title)
+	assert.Equal(t, 400, errorOutput.Status)
+	assert.Equal(t, "Failed to release a lock", errorOutput.Detail)
 }
 
 // TestJoin tests the join endpoint.

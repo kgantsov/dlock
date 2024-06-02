@@ -2,10 +2,8 @@ package cluster
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 
@@ -17,91 +15,69 @@ import (
 )
 
 type Cluster struct {
-	namespace   string
-	serviceName string
-	hostname    string
-	ip          string
-	nodeID      string
-	hosts       []string
-	httpAddr    string
-	joinAddr    string
-	raftAddr    string
+	namespace        string
+	serviceName      string
+	serviceDiscovery ServiceDiscovery
+	hostname         string
+	ip               string
+	nodeID           string
+	hosts            []string
+	httpAddr         string
+	raftAddr         string
 
 	logger *logrus.Logger
 }
 
-func NewCluster(logger *logrus.Logger, namespace, ServiceName, httpAddr string) *Cluster {
+func NewCluster(logger *logrus.Logger, serviceDiscovery ServiceDiscovery, namespace, ServiceName, httpAddr string) *Cluster {
 	c := &Cluster{
-		namespace:   namespace,
-		serviceName: ServiceName,
-		httpAddr:    httpAddr,
-		logger:      logger,
+		namespace:        namespace,
+		serviceName:      ServiceName,
+		httpAddr:         httpAddr,
+		logger:           logger,
+		serviceDiscovery: serviceDiscovery,
 	}
 
 	return c
 }
 
-func (c *Cluster) getIP() (string, error) {
-	addrs, err := net.LookupHost(c.hostname)
-	if err != nil {
-		return "", err
-	}
-
-	for _, a := range addrs {
-		return a, nil
-	}
-	return "", errors.New("Couldn't locat the IP")
-}
-
 func (c *Cluster) Init() error {
 	var err error
-	c.hostname, err = os.Hostname()
+	c.hostname, err = c.serviceDiscovery.Hostname()
 	if err != nil {
 		c.logger.Warnf("Error getting hostname: %s", err)
 		return err
 	}
 
-	c.ip, err = c.getIP()
+	c.ip, err = c.serviceDiscovery.IP()
 	if err != nil {
 		c.logger.Errorf("Couldn't lookup the IP: %v\n", err)
 		return err
 	}
 
-	service := fmt.Sprintf("%s-internal.default.svc.cluster.local", c.serviceName)
-	_, addrs, err := net.LookupSRV("", "", service)
+	addrs, err := c.serviceDiscovery.Lookup()
 	if err != nil {
 		c.logger.Warningln("Error:", err)
+		return err
 	}
 
-	for _, srv := range addrs {
-		if strings.HasPrefix(srv.Target, c.hostname) {
-			c.nodeID = srv.Target
+	for _, addr := range addrs {
+		if strings.HasPrefix(addr, c.hostname) {
+			c.nodeID = addr
 		} else {
-			c.hosts = append(c.hosts, fmt.Sprintf("%s:%s", srv.Target, c.httpAddr))
+			c.hosts = append(c.hosts, addr)
 		}
-
 	}
 
-	if strings.HasPrefix(c.nodeID, fmt.Sprintf("%s-0", c.serviceName)) {
-		if len(c.hosts) >= 1 {
-			c.joinAddr = fmt.Sprintf("%s:%s", c.hosts[0], c.httpAddr)
-		}
-	} else {
-		c.joinAddr = fmt.Sprintf(
-			"%s-0.%s-internal.default.svc.cluster.local.:%s",
-			c.serviceName,
-			c.serviceName,
-			c.httpAddr,
-		)
+	host, _, err := net.SplitHostPort(c.nodeID)
+	if err != nil {
+		return err
 	}
-
-	c.raftAddr = fmt.Sprintf("%s:12000", c.nodeID)
+	c.raftAddr = fmt.Sprintf("%s:12000", host)
 
 	c.logger.Debugf(
-		"Current node is %s discovered hosts %+v joinAddr %s raftAddr %s",
+		"Current node is %s discovered hosts %+v raftAddr %s",
 		c.nodeID,
 		c.hosts,
-		c.joinAddr,
 		c.raftAddr,
 	)
 
@@ -110,10 +86,6 @@ func (c *Cluster) Init() error {
 
 func (c *Cluster) NodeID() string {
 	return c.nodeID
-}
-
-func (c *Cluster) JoinAddr() string {
-	return c.joinAddr
 }
 
 func (c *Cluster) RaftAddr() string {

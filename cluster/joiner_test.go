@@ -15,8 +15,8 @@ func TestJoiner(t *testing.T) {
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Test request parameters
-		assert.Equal(t, req.Method, "POST")
-		assert.Equal(t, req.URL.String(), "/join")
+		assert.Equal(t, "POST", req.Method)
+		assert.Equal(t, "/join", req.URL.String())
 		// Send response to be tested
 		rw.Write([]byte(`OK`))
 	}))
@@ -47,15 +47,15 @@ func TestJoinerRetry(t *testing.T) {
 
 	// Start a local HTTP server
 	server1 := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, req.Method, "POST")
-		assert.Equal(t, req.URL.String(), "/join")
+		assert.Equal(t, "POST", req.Method)
+		assert.Equal(t, "/join", req.URL.String())
 
 		if attemptHost1 < 2 {
 			attemptHost1++
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, attemptHost1, 2)
+		assert.Equal(t, 2, attemptHost1)
 		rw.Write([]byte(`OK`))
 	}))
 	// Close the server when test finishes
@@ -63,15 +63,15 @@ func TestJoinerRetry(t *testing.T) {
 
 	// Start a local HTTP server
 	server2 := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, req.Method, "POST")
-		assert.Equal(t, req.URL.String(), "/join")
+		assert.Equal(t, "POST", req.Method)
+		assert.Equal(t, "/join", req.URL.String())
 
 		if attemptHost2 < 2 {
 			attemptHost2++
 			rw.WriteHeader(http.StatusInternalServerError)
 			return
 		}
-		assert.Equal(t, attemptHost2, 2)
+		assert.Equal(t, 2, attemptHost2)
 		rw.Write([]byte(`OK`))
 	}))
 	// Close the server when test finishes
@@ -109,7 +109,7 @@ func TestJoinerNoHosts(t *testing.T) {
 
 	err := j.Join()
 
-	assert.Equal(t, err, nil)
+	assert.Equal(t, nil, err)
 }
 
 func TestJoinerHostsUnavailable(t *testing.T) {
@@ -119,7 +119,7 @@ func TestJoinerHostsUnavailable(t *testing.T) {
 	hosts := []string{"host1", "host2"}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	assert.NotEqual(t, j, nil)
+	assert.NotEqual(t, nil, j)
 
 	err := j.Join()
 

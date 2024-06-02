@@ -71,7 +71,9 @@ func main() {
 	hosts := []string{}
 
 	if ServiceName != "" {
-		cl := cluster.NewCluster(log, "default", ServiceName, httpAddr)
+		namespace := "default"
+		serviceDiscovery := cluster.NewServiceDiscoverySRV(namespace, ServiceName)
+		cl := cluster.NewCluster(log, serviceDiscovery, namespace, ServiceName, httpAddr)
 
 		if err := cl.Init(); err != nil {
 			log.Warningln("Error initialising a cluster:", err)
@@ -79,7 +81,6 @@ func main() {
 		}
 
 		nodeID = cl.NodeID()
-		joinAddr = cl.JoinAddr()
 		raftAddr = cl.RaftAddr()
 		hosts = cl.Hosts()
 

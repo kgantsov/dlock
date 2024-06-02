@@ -75,7 +75,6 @@ func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Println("Non-OK HTTP status:", resp.StatusCode)
 		return errors.New(fmt.Sprintf("Failed to join: %s", joinAddr))
 	}
 
