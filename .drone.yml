@@ -9,11 +9,21 @@ steps:
     path: /go
   commands:
   - go test ./... -cover -coverprofile coverage.out
+  when:
+    event:
+      exclude:
+      - tag
+
 - name: codecov
   image: robertstettner/drone-codecov
   settings:
     token:
       from_secret: CODECOV_TOKEN
+  when:
+    event:
+      exclude:
+      - tag
+
 - name: build api
   image: plugins/docker
   settings:
