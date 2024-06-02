@@ -100,7 +100,15 @@ func (c *Cluster) Hosts() []string {
 
 func (c *Cluster) LeaderChanged(isLeader bool) {
 	if isLeader {
-		err := c.UpdateServiceEndpointSlice()
+		ip, err := c.serviceDiscovery.IP()
+		if err != nil {
+			c.logger.Errorf("Couldn't lookup the IP: %v\n", err)
+		}
+		c.ip = ip
+
+		c.logger.Infof("Leader changed, updating EndpointSlice with IP: %s\n", c.ip)
+
+		err = c.UpdateServiceEndpointSlice()
 		if err != nil {
 			c.logger.Errorf("Failed to update service edpoint sclice: %s", err.Error())
 		}

@@ -50,7 +50,12 @@ func (s *ServiceDiscoverySRV) Lookup() ([]string, error) {
 }
 
 func (s *ServiceDiscoverySRV) IP() (string, error) {
-	addrs, err := s.lookupIPFn(s.serviceName)
+	hostname, err := s.Hostname()
+	if err != nil {
+		return "", err
+	}
+
+	addrs, err := s.lookupIPFn(hostname)
 	if err != nil {
 		return "", err
 	}
