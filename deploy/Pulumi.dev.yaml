@@ -2,5 +2,5 @@ config:
   dlock:namespace: default
   dlock:replicas: "3"
   dlock:image: "kgantsov/dlock"
-  dlock:tag: "0.2.4"
+  dlock:tag: "0.2.6"
   dlock:httPort: "80"

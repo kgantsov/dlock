@@ -21,6 +21,7 @@ type Joiner struct {
 }
 
 func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *Joiner {
+	logger.Debugf("Creating new joiner: %s %s %v", nodeID, raftAddr, hosts)
 	j := &Joiner{
 		nodeID:   nodeID,
 		raftAddr: raftAddr,

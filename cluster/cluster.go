@@ -70,7 +70,7 @@ func (c *Cluster) Init() error {
 
 	host, _, err := net.SplitHostPort(c.nodeID)
 	if err != nil {
-		return err
+		c.logger.Warningf("Error splitting host and port: %s %v\n", c.nodeID, err)
 	}
 	c.raftAddr = fmt.Sprintf("%s:12000", host)
 
