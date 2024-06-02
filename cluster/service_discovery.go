@@ -35,7 +35,7 @@ func NewServiceDiscoverySRV(namespace, serviceName string) *ServiceDiscoverySRV 
 
 func (s *ServiceDiscoverySRV) Lookup() ([]string, error) {
 	_, addrs, err := s.lookupSRVFn(
-		"", "", fmt.Sprintf("%s.%s.svc.cluster.local", s.serviceName, s.namespace),
+		"", "", fmt.Sprintf("%s-internal.%s.svc.cluster.local", s.serviceName, s.namespace),
 	)
 	if err != nil {
 		return nil, err

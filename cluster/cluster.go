@@ -61,7 +61,7 @@ func (c *Cluster) Init() error {
 	}
 
 	for _, addr := range addrs {
-		c.logger.Debugf("Discovered address: %s %s", c.hostname, addr)
+		c.logger.Debugf("Discovered address: %s Current host: %s", addr, c.hostname)
 
 		if strings.HasPrefix(addr, c.hostname) {
 			c.nodeID = addr
