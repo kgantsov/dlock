@@ -8,7 +8,12 @@ steps:
   - name: deps
     path: /go
   commands:
-  - go test ./... -cover
+  - go test ./... -cover -coverprofile coverage.out
+- name: codecov
+  image: robertstettner/drone-codecov
+  settings:
+    token:
+      from_secret: CODECOV_TOKEN
 - name: build api
   image: plugins/docker
   settings:
