@@ -2,6 +2,13 @@ kind: pipeline
 name: default
 
 steps:
+- name: test
+  image: golang:1.22.2
+  volumes:
+  - name: deps
+    path: /go
+  commands:
+  - go test ./... -cover
 - name: build api
   image: plugins/docker
   settings:
