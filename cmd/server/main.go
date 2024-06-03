@@ -19,15 +19,13 @@ const (
 )
 
 // Command line parameters
-var inmemory bool
 var httpAddr string
 var raftAddr string
 var joinAddr string
 var nodeID string
 var ServiceName string
 
-func init() {
-	flag.BoolVar(&inmemory, "inmemory", false, "Use in-memory storage for Raft")
+func main() {
 	flag.StringVar(&httpAddr, "haddr", DefaultHTTPAddr, "Set the HTTP bind address")
 	flag.StringVar(&raftAddr, "raddr", DefaultRaftAddr, "Set Raft bind address")
 	flag.StringVar(&joinAddr, "join", "", "Set join address, if any")
@@ -37,9 +35,7 @@ func init() {
 		fmt.Fprintf(os.Stderr, "Usage: %s [options] <raft-data-path> \n", os.Args[0])
 		flag.PrintDefaults()
 	}
-}
 
-func main() {
 	flag.Parse()
 	log := logrus.New()
 	log.SetFormatter(&logrus.TextFormatter{
@@ -62,7 +58,7 @@ func main() {
 		log.Fatalf("failed to create path for Raft storage: %s", err.Error())
 	}
 
-	s := store.New(log, inmemory)
+	s := store.New(log)
 	s.RaftDir = raftDir
 	s.RunValueLogGC()
 

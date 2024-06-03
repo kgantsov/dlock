@@ -13,7 +13,7 @@ import (
 func TestStoreOpen(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
-	s := New(log, false)
+	s := New(log)
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
@@ -33,7 +33,7 @@ func TestStoreOpenSingleNode(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 
-	s := New(log, false)
+	s := New(log)
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
@@ -78,7 +78,7 @@ func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 
-	s := New(log, false)
+	s := New(log)
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 

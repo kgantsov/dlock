@@ -35,7 +35,6 @@ type command struct {
 type Store struct {
 	RaftDir  string
 	RaftBind string
-	inmemory bool
 	ServerID raft.ServerID
 
 	mu    sync.Mutex
@@ -49,9 +48,8 @@ type Store struct {
 }
 
 // New returns a new Store.
-func New(logger *logrus.Logger, inmemory bool) *Store {
+func New(logger *logrus.Logger) *Store {
 	return &Store{
-		inmemory:       inmemory,
 		logger:         logger,
 		leaderChangeFn: func(bool) {},
 	}
@@ -89,20 +87,15 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Create the log store and stable store.
 	var logStore raft.LogStore
 	var stableStore raft.StableStore
-	if s.inmemory {
-		logStore = raft.NewInmemStore()
-		stableStore = raft.NewInmemStore()
-	} else {
-		badgerDB, err := badgerdb.New(badgerdb.Options{
-			Path: s.RaftDir,
-		})
-		if err != nil {
-			return fmt.Errorf("new store: %s", err)
-		}
-		logStore = badgerDB
-		stableStore = badgerDB
-		s.store = badgerDB
+	badgerDB, err := badgerdb.New(badgerdb.Options{
+		Path: s.RaftDir,
+	})
+	if err != nil {
+		return fmt.Errorf("new store: %s", err)
 	}
+	logStore = badgerDB
+	stableStore = badgerDB
+	s.store = badgerDB
 
 	// Instantiate the Raft systems.
 	ra, err := raft.NewRaft(config, (*FSM)(s), logStore, stableStore, snapshots, transport)
