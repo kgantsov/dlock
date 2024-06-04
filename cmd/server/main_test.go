@@ -55,5 +55,3 @@ func TestMainFunction(t *testing.T) {
 		t.Fatalf("unexpected status code: %d", resp.StatusCode)
 	}
 }
-
-// Mock functions and structures here if needed

@@ -107,11 +107,10 @@ func main() {
 		log.Fatal(err.Error())
 	}
 
-	// We're up and running!
-	log.Infof("hraftd started successfully, listening on http://%s", httpAddr)
+	log.Infof("dlock started successfully, listening on http://%s", httpAddr)
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt)
 	<-terminate
-	log.Info("hraftd exiting")
+	log.Info("dlock exiting")
 }
