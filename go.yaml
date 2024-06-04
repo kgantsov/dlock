@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  # This name uniquely identifies the Deployment
+  name: golang
+  namespace: default
+spec:  
+  replicas: 1
+  selector:
+    matchLabels:
+      module: golang
+  template:
+    metadata:
+      labels:
+        # This label is used as a selector in Service definition
+        module: golang
+    spec:
+      containers:
+      - name: golang
+        image: golang:1.22.2
+        command:
+          - "sh"
+          - "-c"
+          - "while true; do sleep 6000; done"

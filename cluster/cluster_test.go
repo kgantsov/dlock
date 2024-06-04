@@ -1,13 +1,26 @@
 package cluster
 
 import (
+	"context"
 	"errors"
 	"net"
 	"testing"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	discoveryv1 "k8s.io/api/discovery/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 )
+
+func mockInClusterConfig() (*rest.Config, error) {
+	return &rest.Config{}, nil
+}
+
+func mockInClusterConfigError() (*rest.Config, error) {
+	return nil, errors.New("in-cluster config error")
+}
 
 // TestCluster_Init tests the Init method of the Cluster
 func TestCluster_Init(t *testing.T) {
@@ -16,6 +29,7 @@ func TestCluster_Init(t *testing.T) {
 	c := NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
 
@@ -39,6 +53,7 @@ func TestCluster_InitError(t *testing.T) {
 	c := NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
 
@@ -52,6 +67,7 @@ func TestCluster_InitError(t *testing.T) {
 	c = NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
 
@@ -65,6 +81,7 @@ func TestCluster_InitError(t *testing.T) {
 	c = NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
 
@@ -81,6 +98,7 @@ func TestCluster_NodeID(t *testing.T) {
 	c := NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
 	assert.Nil(t, err)
@@ -94,6 +112,7 @@ func TestCluster_NodeID(t *testing.T) {
 	c = NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
 	assert.Nil(t, err)
@@ -111,6 +130,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	c := NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
 	assert.Nil(t, err)
@@ -124,6 +144,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	c = NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
 	assert.Nil(t, err)
@@ -138,6 +159,7 @@ func TestCluster_Hosts(t *testing.T) {
 	c := NewCluster(
 		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
+	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
 	assert.Nil(t, err)
@@ -162,5 +184,108 @@ func createMockServiceDiscoverySRV() *ServiceDiscoverySRV {
 		lookupHostnameFn: func() (string, error) {
 			return "dlock-2", nil
 		},
+	}
+}
+
+// TestUpdateServiceEndpointSlice tests the UpdateServiceEndpointSlice method of the Cluster
+func TestInitKubeClient(t *testing.T) {
+	tests := []struct {
+		name            string
+		cluster         Cluster
+		inClusterConfig func() (*rest.Config, error)
+		setupClient     func() *fake.Clientset
+		expectedErr     string
+	}{
+		{
+			name: "successful execution",
+			cluster: Cluster{
+				namespace:   "default",
+				serviceName: "test-service",
+				httpAddr:    "8080",
+				ip:          "192.168.1.1",
+				hostname:    "test-host",
+				logger:      &logrus.Logger{},
+			},
+			inClusterConfig: mockInClusterConfig,
+			expectedErr:     "",
+		},
+		{
+			name: "error in InClusterConfig",
+			cluster: Cluster{
+				namespace:   "default",
+				serviceName: "test-service",
+				httpAddr:    "8080",
+				ip:          "192.168.1.1",
+				hostname:    "test-host",
+				logger:      &logrus.Logger{},
+			},
+			inClusterConfig: mockInClusterConfigError,
+			expectedErr:     "in-cluster config error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.cluster.inClusterConfigFunc = tt.inClusterConfig
+
+			err := tt.cluster.InitKubeClient()
+
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			}
+		})
+	}
+}
+
+func TestUpdateServiceEndpointSlice(t *testing.T) {
+	tests := []struct {
+		name            string
+		cluster         Cluster
+		inClusterConfig func() (*rest.Config, error)
+		setupClient     func() *fake.Clientset
+		expectedErr     string
+	}{
+		{
+			name: "successful execution",
+			cluster: Cluster{
+				namespace:   "default",
+				serviceName: "test-service",
+				httpAddr:    "8080",
+				ip:          "192.168.1.1",
+				hostname:    "test-host",
+				logger:      &logrus.Logger{},
+			},
+			inClusterConfig: mockInClusterConfig,
+			setupClient: func() *fake.Clientset {
+				client := fake.NewSimpleClientset()
+				client.DiscoveryV1().EndpointSlices("default").Create(context.TODO(), &discoveryv1.EndpointSlice{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "test-service",
+						Namespace: "default",
+					},
+				}, metav1.CreateOptions{})
+				return client
+			},
+			expectedErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.cluster.inClusterConfigFunc = tt.inClusterConfig
+			tt.cluster.clientset = tt.setupClient()
+
+			err := tt.cluster.UpdateServiceEndpointSlice()
+
+			if tt.expectedErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedErr)
+			}
+		})
 	}
 }

@@ -25,16 +25,20 @@ type Cluster struct {
 	httpAddr         string
 	raftAddr         string
 
+	clientset           kubernetes.Interface
+	inClusterConfigFunc func() (*rest.Config, error)
+
 	logger *logrus.Logger
 }
 
 func NewCluster(logger *logrus.Logger, serviceDiscovery ServiceDiscovery, namespace, ServiceName, httpAddr string) *Cluster {
 	c := &Cluster{
-		namespace:        namespace,
-		serviceName:      ServiceName,
-		httpAddr:         httpAddr,
-		logger:           logger,
-		serviceDiscovery: serviceDiscovery,
+		namespace:           namespace,
+		serviceName:         ServiceName,
+		httpAddr:            httpAddr,
+		logger:              logger,
+		serviceDiscovery:    serviceDiscovery,
+		inClusterConfigFunc: rest.InClusterConfig,
 	}
 
 	return c
@@ -76,12 +80,28 @@ func (c *Cluster) Init() error {
 	}
 	c.raftAddr = fmt.Sprintf("%s:12000", host)
 
+	c.InitKubeClient()
+
 	c.logger.Debugf(
 		"Current node is %s discovered hosts %+v raftAddr %s",
 		c.nodeID,
 		c.hosts,
 		c.raftAddr,
 	)
+
+	return nil
+}
+
+func (c *Cluster) InitKubeClient() error {
+	config, err := c.inClusterConfigFunc()
+	if err != nil {
+		return err
+	}
+
+	c.clientset, err = kubernetes.NewForConfig(config)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -116,18 +136,7 @@ func (c *Cluster) LeaderChanged(isLeader bool) {
 }
 
 func (c *Cluster) UpdateServiceEndpointSlice() error {
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		return err
-	}
-
-	// Create Kubernetes clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return err
-	}
-
-	err = clientset.DiscoveryV1().EndpointSlices(c.namespace).Delete(
+	err := c.clientset.DiscoveryV1().EndpointSlices(c.namespace).Delete(
 		context.TODO(), c.serviceName, metav1.DeleteOptions{},
 	)
 	if err != nil {
@@ -144,7 +153,6 @@ func (c *Cluster) UpdateServiceEndpointSlice() error {
 	}
 	port = int32(i)
 
-	// Define the new EndpointSlice object
 	newEndpointSlice := &discoveryv1.EndpointSlice{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "discovery.k8s.io/v1",
@@ -167,7 +175,6 @@ func (c *Cluster) UpdateServiceEndpointSlice() error {
 				Hostname: &c.hostname,
 			},
 		},
-
 		Ports: []discoveryv1.EndpointPort{
 			{
 				Name: &name,
@@ -176,8 +183,7 @@ func (c *Cluster) UpdateServiceEndpointSlice() error {
 		},
 	}
 
-	// Create the new EndpointSlice
-	createdEndpointSlice, err := clientset.DiscoveryV1().EndpointSlices(c.namespace).Create(
+	createdEndpointSlice, err := c.clientset.DiscoveryV1().EndpointSlices(c.namespace).Create(
 		context.TODO(), newEndpointSlice, metav1.CreateOptions{},
 	)
 	if err != nil {
