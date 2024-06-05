@@ -24,7 +24,7 @@ steps:
       exclude:
       - tag
 
-- name: build api
+- name: build and push the service
   image: plugins/docker
   settings:
     username:
