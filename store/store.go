@@ -87,7 +87,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Create the log store and stable store.
 	var logStore raft.LogStore
 	var stableStore raft.StableStore
-	badgerDB, err := badgerdb.New(badgerdb.Options{
+	badgerDB, err := badgerdb.New(s.logger, badgerdb.Options{
 		Path: s.RaftDir,
 	})
 	if err != nil {

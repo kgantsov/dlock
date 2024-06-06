@@ -38,11 +38,11 @@ func main() {
 
 	flag.Parse()
 	log := logrus.New()
+	log.SetLevel(logrus.InfoLevel)
 	log.SetFormatter(&logrus.TextFormatter{
 		DisableColors: true,
 		FullTimestamp: true,
 	})
-	log.SetLevel(logrus.DebugLevel)
 
 	if flag.NArg() == 0 {
 		fmt.Fprintf(os.Stderr, "No Raft storage directory specified\n")

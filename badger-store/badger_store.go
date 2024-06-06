@@ -7,6 +7,7 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -38,6 +39,8 @@ type BadgerStore struct {
 	path string
 
 	msgpackUseNewTimeFormat bool
+
+	logger *logrus.Logger
 }
 
 // Options contains all the configuration used to open the Badger
@@ -55,11 +58,13 @@ type Options struct {
 	// go-msgpack v1.1.5 by default). Decoding is not affected, as all
 	// go-msgpack v2.1.0+ decoders know how to decode both formats.
 	MsgpackUseNewTimeFormat bool
+
+	logger *logrus.Logger
 }
 
 // NewBadgerStore takes a file path and returns a connected Raft backend.
-func NewBadgerStore(path string) (*BadgerStore, error) {
-	return New(Options{Path: path})
+func NewBadgerStore(logger *logrus.Logger, path string) (*BadgerStore, error) {
+	return New(logger, Options{Path: path})
 }
 
 func addPrefix(prefix []byte, key []byte) []byte {
@@ -67,7 +72,7 @@ func addPrefix(prefix []byte, key []byte) []byte {
 }
 
 // New uses the supplied options to open the Badger and prepare it for use as a raft backend.
-func New(options Options) (*BadgerStore, error) {
+func New(logger *logrus.Logger, options Options) (*BadgerStore, error) {
 	// Try to connect
 	db, err := badger.Open(badger.DefaultOptions(options.Path))
 	if err != nil {
@@ -79,6 +84,7 @@ func New(options Options) (*BadgerStore, error) {
 		db:                      db,
 		path:                    options.Path,
 		msgpackUseNewTimeFormat: options.MsgpackUseNewTimeFormat,
+		logger:                  logger,
 	}
 
 	// // If the store was opened read-only, don't try and create buckets
@@ -176,7 +182,7 @@ func (b *BadgerStore) GetLog(idx uint64, log *raft.Log) error {
 	if val == nil || err != nil {
 		return raft.ErrLogNotFound
 	}
-	return decodeMsgPack(val, log)
+	return DecodeMsgPack(val, log)
 }
 
 // StoreLog is used to store a single raft log
@@ -186,12 +192,14 @@ func (b *BadgerStore) StoreLog(log *raft.Log) error {
 
 // StoreLogs is used to store a set of raft logs
 func (b *BadgerStore) StoreLogs(logs []*raft.Log) error {
+	b.logger.Debugf("Storing logs: %+v", logs)
+
 	txn := b.db.NewTransaction(true)
 	defer txn.Discard()
 
 	for _, log := range logs {
 		key := uint64ToBytes(log.Index)
-		val, err := encodeMsgPack(log, b.msgpackUseNewTimeFormat)
+		val, err := EncodeMsgPack(log, b.msgpackUseNewTimeFormat)
 		if err != nil {
 			return err
 		}
@@ -262,6 +270,54 @@ func (b *BadgerStore) DeleteRange(min, max uint64) error {
 	return nil
 }
 
+func (b *BadgerStore) CopyLogs(w io.Writer) error {
+	txn := b.db.NewTransaction(false)
+	defer txn.Discard()
+
+	opts := badger.DefaultIteratorOptions
+	opts.PrefetchSize = 100
+	opts.PrefetchValues = true
+
+	it := txn.NewIterator(opts)
+	defer it.Close()
+	prefix := []byte(dbLogs)
+	cnt := 0
+
+	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		item := it.Item()
+		key := item.Key()
+
+		b.logger.Debugf("Copying key %s %d", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]))
+
+		val, err := item.ValueCopy(nil)
+
+		if err != nil || val == nil {
+			b.logger.Debugf("Error reading key %s %d", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]))
+			continue
+		}
+
+		log := &raft.Log{}
+
+		if err := DecodeMsgPack(val, log); err != nil {
+			b.logger.Debugf("Failed to decode log: %v", err)
+			continue
+		}
+
+		if _, err := w.Write(log.Data); err != nil {
+			b.logger.Debugf("Error writing key %s %d %v", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]), err)
+			continue
+		}
+		if _, err := w.Write([]byte("\n")); err != nil {
+			b.logger.Debugf("Error writing key %s %d", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]))
+			continue
+		}
+		cnt += 1
+	}
+
+	b.logger.Debugf("Total logs copied: %d", cnt)
+	return nil
+}
+
 // Set is used to set a key/value set outside of the raft log
 func (b *BadgerStore) Set(k, v []byte) error {
 	txn := b.db.NewTransaction(true)
@@ -294,6 +350,8 @@ func (b *BadgerStore) Get(k []byte) ([]byte, error) {
 
 // Set is used to set a key/value set outside of the raft log
 func (b *BadgerStore) Acquire(k []byte, expireAt time.Time) error {
+	b.logger.Debugf("Acquiring lock for key: %s", k)
+
 	txn := b.db.NewTransaction(true)
 	defer txn.Discard()
 
@@ -361,11 +419,6 @@ func (b *BadgerStore) GetUint64(key []byte) (uint64, error) {
 // DBPath returns a path to a DB file
 func (b *BadgerStore) DBPath() string {
 	return b.path
-}
-
-// StoreLog is used to store a single raft log
-func (b *BadgerStore) Backup(w io.Writer, since uint64) (uint64, error) {
-	return b.db.Backup(w, since)
 }
 
 func (b *BadgerStore) RunValueLogGC(discardRatio float64) error {

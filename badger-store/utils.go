@@ -8,7 +8,7 @@ import (
 )
 
 // Decode reverses the encode operation on a byte slice input
-func decodeMsgPack(buf []byte, out interface{}) error {
+func DecodeMsgPack(buf []byte, out interface{}) error {
 	r := bytes.NewBuffer(buf)
 	hd := codec.MsgpackHandle{}
 	dec := codec.NewDecoder(r, &hd)
@@ -16,7 +16,7 @@ func decodeMsgPack(buf []byte, out interface{}) error {
 }
 
 // Encode writes an encoded object to a new bytes buffer
-func encodeMsgPack(in interface{}, useNewTimeFormat bool) (*bytes.Buffer, error) {
+func EncodeMsgPack(in interface{}, useNewTimeFormat bool) (*bytes.Buffer, error) {
 	buf := bytes.NewBuffer(nil)
 	hd := codec.MsgpackHandle{
 		BasicHandle: codec.BasicHandle{

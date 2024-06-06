@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	"github.com/sirupsen/logrus"
 )
 
 func testBadgerStore(t testing.TB) *BadgerStore {
@@ -18,7 +19,7 @@ func testBadgerStore(t testing.TB) *BadgerStore {
 	os.Remove(dirname)
 
 	// Successfully creates and returns a store
-	store, err := NewBadgerStore(dirname)
+	store, err := NewBadgerStore(&logrus.Logger{}, dirname)
 	if err != nil {
 		t.Fatalf("err: %s", err)
 	}
