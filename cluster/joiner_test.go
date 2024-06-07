@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/sirupsen/logrus"
 )
@@ -32,13 +33,10 @@ func TestJoiner(t *testing.T) {
 	hosts := []string{host}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	if j == nil {
-		t.Fatalf("failed to create Joiner")
-	}
+	assert.NotEqual(t, nil, j)
 
-	if err := j.Join(); err != nil {
-		t.Fatalf("failed to join hosts: %s", err)
-	}
+	err := j.Join()
+	require.NoError(t, err)
 }
 
 func TestJoinerRetry(t *testing.T) {
@@ -87,13 +85,10 @@ func TestJoinerRetry(t *testing.T) {
 	hosts := []string{host1, host2}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	if j == nil {
-		t.Fatalf("failed to create Joiner")
-	}
+	assert.NotEqual(t, nil, j)
 
-	if err := j.Join(); err != nil {
-		t.Fatalf("failed to join hosts: %s", err)
-	}
+	err := j.Join()
+	require.NoError(t, err)
 }
 
 func TestJoinerNoHosts(t *testing.T) {
@@ -103,9 +98,7 @@ func TestJoinerNoHosts(t *testing.T) {
 	hosts := []string{}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	if j == nil {
-		t.Fatalf("failed to create Joiner")
-	}
+	assert.NotEqual(t, nil, j)
 
 	err := j.Join()
 

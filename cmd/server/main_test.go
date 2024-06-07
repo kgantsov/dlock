@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Helper function to set up command line arguments
@@ -22,9 +24,7 @@ func setUpArgs(args []string) {
 func TestMainFunction(t *testing.T) {
 	// Setup temporary directory for Raft storage
 	tempDir, err := ioutil.TempDir("", "raft")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %s", err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir) // clean up
 
 	// Setup command line arguments
@@ -46,12 +46,8 @@ func TestMainFunction(t *testing.T) {
 	resp, err := http.Post(
 		"http://127.0.0.1:11000/API/v1/locks/:key", "application/json", bytes.NewBuffer(jsonStr),
 	)
-	if err != nil {
-		t.Fatalf("failed to perform HTTP request: %s", err)
-	}
+	require.NoError(t, err)
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("unexpected status code: %d", resp.StatusCode)
-	}
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
 }

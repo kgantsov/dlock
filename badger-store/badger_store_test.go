@@ -3,7 +3,6 @@ package badgerstore
 import (
 	"bytes"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -15,16 +14,13 @@ import (
 
 func testBadgerStore(t testing.TB) *BadgerStore {
 	dirname, err := os.MkdirTemp("", "store")
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	require.NoError(t, err)
+
 	os.Remove(dirname)
 
 	// Successfully creates and returns a store
 	store, err := NewBadgerStore(&logrus.Logger{}, dirname)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	require.NoError(t, err)
 
 	return store
 }
@@ -38,12 +34,11 @@ func testRaftLog(idx uint64, data string) *raft.Log {
 
 func TestBadgerStore_Implements(t *testing.T) {
 	var store interface{} = &BadgerStore{}
-	if _, ok := store.(raft.StableStore); !ok {
-		t.Fatalf("BadgerStore does not implement raft.StableStore")
-	}
-	if _, ok := store.(raft.LogStore); !ok {
-		t.Fatalf("BadgerStore does not implement raft.LogStore")
-	}
+	_, ok := store.(raft.StableStore)
+	assert.Equal(t, true, ok)
+
+	_, ok = store.(raft.LogStore)
+	assert.Equal(t, true, ok)
 }
 
 func TestBadgerStore_FirstIndex(t *testing.T) {
@@ -53,12 +48,9 @@ func TestBadgerStore_FirstIndex(t *testing.T) {
 
 	// Should get 0 index on empty log
 	idx, err := store.FirstIndex()
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if idx != 0 {
-		t.Fatalf("bad: %v", idx)
-	}
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(0), idx)
 
 	// Set a mock raft log
 	logs := []*raft.Log{
@@ -66,18 +58,14 @@ func TestBadgerStore_FirstIndex(t *testing.T) {
 		testRaftLog(2, "log2"),
 		testRaftLog(3, "log3"),
 	}
-	if err := store.StoreLogs(logs); err != nil {
-		t.Fatalf("bad: %s", err)
-	}
+	err = store.StoreLogs(logs)
+	require.NoError(t, err)
 
 	// Fetch the first Raft index
 	idx, err = store.FirstIndex()
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if idx != 1 {
-		t.Fatalf("bad: %d", idx)
-	}
+	require.NoError(t, err)
+
+	assert.Equal(t, uint64(1), idx)
 }
 
 func TestBadgerStore_LastIndex(t *testing.T) {
@@ -87,12 +75,8 @@ func TestBadgerStore_LastIndex(t *testing.T) {
 
 	// Should get 0 index on empty log
 	idx, err := store.LastIndex()
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if idx != 0 {
-		t.Fatalf("bad: %v", idx)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, uint64(0), idx)
 
 	// Set a mock raft log
 	logs := []*raft.Log{
@@ -100,18 +84,13 @@ func TestBadgerStore_LastIndex(t *testing.T) {
 		testRaftLog(2, "log2"),
 		testRaftLog(3, "log3"),
 	}
-	if err := store.StoreLogs(logs); err != nil {
-		t.Fatalf("bad: %s", err)
-	}
+	err = store.StoreLogs(logs)
+	require.NoError(t, err)
 
 	// Fetch the last Raft index
 	idx, err = store.LastIndex()
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if idx != 3 {
-		t.Fatalf("bad: %d", idx)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, uint64(3), idx)
 }
 
 func TestBadgerStore_GetLog(t *testing.T) {
@@ -122,9 +101,8 @@ func TestBadgerStore_GetLog(t *testing.T) {
 	log := new(raft.Log)
 
 	// Should return an error on non-existent log
-	if err := store.GetLog(1, log); err != raft.ErrLogNotFound {
-		t.Fatalf("expected raft log not found error, got: %v", err)
-	}
+	err := store.GetLog(1, log)
+	assert.Equal(t, raft.ErrLogNotFound, err)
 
 	// Set a mock raft log
 	logs := []*raft.Log{
@@ -132,17 +110,14 @@ func TestBadgerStore_GetLog(t *testing.T) {
 		testRaftLog(2, "log2"),
 		testRaftLog(3, "log3"),
 	}
-	if err := store.StoreLogs(logs); err != nil {
-		t.Fatalf("bad: %s", err)
-	}
+	err = store.StoreLogs(logs)
+	require.NoError(t, err)
 
 	// Should return the proper log
-	if err := store.GetLog(2, log); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if !reflect.DeepEqual(log, logs[1]) {
-		t.Fatalf("bad: %#v", log)
-	}
+	err = store.GetLog(2, log)
+	require.NoError(t, err)
+
+	assert.Equal(t, logs[1], log)
 }
 
 func TestBadgerStore_SetLog(t *testing.T) {
@@ -157,20 +132,15 @@ func TestBadgerStore_SetLog(t *testing.T) {
 	}
 
 	// Attempt to store the log
-	if err := store.StoreLog(log); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err := store.StoreLog(log)
+	require.NoError(t, err)
 
 	// Retrieve the log again
 	result := new(raft.Log)
-	if err := store.GetLog(1, result); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err = store.GetLog(1, result)
+	require.NoError(t, err)
 
-	// Ensure the log comes back the same
-	if !reflect.DeepEqual(log, result) {
-		t.Fatalf("bad: %v", result)
-	}
+	assert.Equal(t, log, result)
 }
 
 func TestBadgerStore_SetLogs(t *testing.T) {
@@ -187,24 +157,19 @@ func TestBadgerStore_SetLogs(t *testing.T) {
 	}
 
 	// Attempt to store the logs
-	if err := store.StoreLogs(logs); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err := store.StoreLogs(logs)
+	require.NoError(t, err)
 
 	// Ensure we stored them all
 	result1, result2 := new(raft.Log), new(raft.Log)
-	if err := store.GetLog(1, result1); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if !reflect.DeepEqual(logs[0], result1) {
-		t.Fatalf("bad: %#v", result1)
-	}
-	if err := store.GetLog(3, result2); err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if !reflect.DeepEqual(logs[2], result2) {
-		t.Fatalf("bad: %#v", result2)
-	}
+
+	err = store.GetLog(1, result1)
+	require.NoError(t, err)
+	assert.Equal(t, logs[0], result1)
+
+	err = store.GetLog(3, result2)
+	require.NoError(t, err)
+	assert.Equal(t, logs[2], result2)
 }
 
 func TestBadgerStore_DeleteRange(t *testing.T) {
@@ -221,25 +186,26 @@ func TestBadgerStore_DeleteRange(t *testing.T) {
 	logs := []*raft.Log{log1, log2, log3, log4, log5}
 
 	// Attempt to store the logs
-	if err := store.StoreLogs(logs); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err := store.StoreLogs(logs)
+	require.NoError(t, err)
 
 	// Attempt to delete a range of logs
-	if err := store.DeleteRange(1, 3); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err = store.DeleteRange(1, 3)
+	require.NoError(t, err)
 
 	// Ensure the logs were deleted
-	if err := store.GetLog(1, new(raft.Log)); err != raft.ErrLogNotFound {
-		t.Fatalf("should have deleted log1")
-	}
-	if err := store.GetLog(2, new(raft.Log)); err != raft.ErrLogNotFound {
-		t.Fatalf("should have deleted log2")
-	}
-	if err := store.GetLog(3, new(raft.Log)); err != raft.ErrLogNotFound {
-		t.Fatalf("should have deleted log2")
-	}
+
+	err = store.GetLog(1, new(raft.Log))
+	assert.Equal(t, raft.ErrLogNotFound, err)
+
+	err = store.GetLog(2, new(raft.Log))
+	assert.Equal(t, raft.ErrLogNotFound, err)
+
+	err = store.GetLog(3, new(raft.Log))
+	assert.Equal(t, raft.ErrLogNotFound, err)
+
+	err = store.GetLog(4, new(raft.Log))
+	require.NoError(t, err)
 }
 
 // TestCopyLogs tests that the copyLogs method works as expected
@@ -274,25 +240,19 @@ func TestBadgerStore_Set_Get(t *testing.T) {
 	defer os.Remove(store.path)
 
 	// Returns error on non-existent key
-	if _, err := store.Get([]byte("bad")); err != ErrKeyNotFound {
-		t.Fatalf("expected not found error, got: %q", err)
-	}
+	_, err := store.Get([]byte("bad"))
+	assert.Equal(t, ErrKeyNotFound, err)
 
 	k, v := []byte("hello"), []byte("world")
 
 	// Try to set a k/v pair
-	if err := store.Set(k, v); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err = store.Set(k, v)
+	require.NoError(t, err)
 
 	// Try to read it back
 	val, err := store.Get(k)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if !bytes.Equal(val, v) {
-		t.Fatalf("bad: %v", val)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, v, val)
 }
 
 func TestBadgerStore_SetUint64_GetUint64(t *testing.T) {
@@ -301,25 +261,19 @@ func TestBadgerStore_SetUint64_GetUint64(t *testing.T) {
 	defer os.Remove(store.path)
 
 	// Returns error on non-existent key
-	if _, err := store.GetUint64([]byte("bad")); err != ErrKeyNotFound {
-		t.Fatalf("expected not found error, got: %q", err)
-	}
+	_, err := store.GetUint64([]byte("bad"))
+	assert.Equal(t, ErrKeyNotFound, err)
 
 	k, v := []byte("abc"), uint64(123)
 
 	// Attempt to set the k/v pair
-	if err := store.SetUint64(k, v); err != nil {
-		t.Fatalf("err: %s", err)
-	}
+	err = store.SetUint64(k, v)
+	require.NoError(t, err)
 
 	// Read back the value
 	val, err := store.GetUint64(k)
-	if err != nil {
-		t.Fatalf("err: %s", err)
-	}
-	if val != v {
-		t.Fatalf("bad: %v", val)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, v, val)
 }
 
 func TestBadgerStore_Acquire_Release(t *testing.T) {
@@ -327,25 +281,20 @@ func TestBadgerStore_Acquire_Release(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != ErrNotAbleToAcquireLock {
-		t.Fatalf("expected ErrNotAbleToAcquireLock error, got: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	assert.Equal(t, ErrNotAbleToAcquireLock, err)
 
-	if err := store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
-	if err := store.Release([]byte("my-lock:1")); err != nil {
-		t.Fatalf("expected to release a lock, got: %q", err)
-	}
+	err = store.Release([]byte("my-lock:1"))
+	require.NoError(t, err)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 }
 
 func TestBadgerStore_Acquire_Release_WithTTL(t *testing.T) {
@@ -353,19 +302,16 @@ func TestBadgerStore_Acquire_Release_WithTTL(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != ErrNotAbleToAcquireLock {
-		t.Fatalf("expected ErrNotAbleToAcquireLock error, got: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	assert.Equal(t, ErrNotAbleToAcquireLock, err)
 
 	time.Sleep(1 * time.Second)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 }
 
 // TestDBPath tests that the DBPath method returns the correct path
@@ -374,9 +320,7 @@ func TestDBPath(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	if store.DBPath() != store.path {
-		t.Fatalf("bad path: %s", store.DBPath())
-	}
+	assert.Equal(t, store.path, store.DBPath())
 }
 
 func TestBadgerStore_Locks(t *testing.T) {
@@ -384,21 +328,16 @@ func TestBadgerStore_Locks(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	if err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
-	if err := store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
-	if err := store.Acquire([]byte("my-lock:3"), time.Now().UTC().Add(time.Second*1)); err != nil {
-		t.Fatalf("expected to acquire a lock, got error: %q", err)
-	}
+	err = store.Acquire([]byte("my-lock:3"), time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
 
 	locks := store.Locks()
 
-	if len(locks) != 3 {
-		t.Fatalf("expected to get 3 locks, got %d", len(locks))
-	}
+	assert.Equal(t, 3, len(locks))
 }
