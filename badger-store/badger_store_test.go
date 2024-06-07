@@ -9,6 +9,8 @@ import (
 
 	"github.com/hashicorp/raft"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testBadgerStore(t testing.TB) *BadgerStore {
@@ -238,6 +240,32 @@ func TestBadgerStore_DeleteRange(t *testing.T) {
 	if err := store.GetLog(3, new(raft.Log)); err != raft.ErrLogNotFound {
 		t.Fatalf("should have deleted log2")
 	}
+}
+
+// TestCopyLogs tests that the copyLogs method works as expected
+func TestCopyLogs(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	// Create a set of logs
+	logs := []*raft.Log{
+		testRaftLog(1, "log1"),
+		testRaftLog(2, "log2"),
+		testRaftLog(3, "log3"),
+		testRaftLog(4, "log4"),
+		testRaftLog(5, "log5"),
+	}
+
+	err := store.StoreLogs(logs)
+	require.NoError(t, err)
+
+	// Attempt to copy the logs
+	buf := &bytes.Buffer{}
+	err = store.CopyLogs(buf)
+	require.NoError(t, err)
+
+	assert.Equal(t, "log1\nlog2\nlog3\nlog4\nlog5\n", buf.String())
 }
 
 func TestBadgerStore_Set_Get(t *testing.T) {

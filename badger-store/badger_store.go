@@ -86,15 +86,6 @@ func New(logger *logrus.Logger, options Options) (*BadgerStore, error) {
 		msgpackUseNewTimeFormat: options.MsgpackUseNewTimeFormat,
 		logger:                  logger,
 	}
-
-	// // If the store was opened read-only, don't try and create buckets
-	// if !options.readOnly() {
-	// 	// Set up our buckets
-	// 	if err := store.initialize(); err != nil {
-	// 		store.Close()
-	// 		return nil, err
-	// 	}
-	// }
 	return store, nil
 }
 

@@ -96,14 +96,23 @@ func TestFSM_Restore(t *testing.T) {
 	fsm := &FSM{store: store, logger: logger}
 
 	// Apply some commands to the FSM
-	c := &command{
+	acquireCommand1 := &command{
 		Op:   "acquire",
 		Key:  "test-lock-1",
 		Time: time.Now().UTC().Add(time.Second * time.Duration(10)).Format(time.RFC3339),
 	}
-	b, _ := json.Marshal(c)
+	acquireCommand1Binary, _ := json.Marshal(acquireCommand1)
+	releaseCommand1 := &command{
+		Op:   "release",
+		Key:  "test-lock-2",
+		Time: time.Now().UTC().Add(time.Second * time.Duration(10)).Format(time.RFC3339),
+	}
+	releaseCommand1Binary, _ := json.Marshal(releaseCommand1)
 
-	err = store.StoreLog(&raft.Log{Data: b})
+	err = store.StoreLogs([]*raft.Log{
+		{Index: 1, Term: 1, Data: releaseCommand1Binary},
+		{Index: 2, Term: 1, Data: acquireCommand1Binary},
+	})
 	require.NoError(t, err)
 
 	// Create a snapshot
@@ -115,7 +124,9 @@ func TestFSM_Restore(t *testing.T) {
 	err = snapshot.Persist(sink)
 	require.NoError(t, err)
 
-	assert.Equal(t, string(b)+"\n", sink.buf.String())
+	assert.Equal(
+		t, string(releaseCommand1Binary)+"\n"+string(acquireCommand1Binary)+"\n", sink.buf.String(),
+	)
 
 	// Close the current store and restore from the snapshot
 	err = fsm.store.Close()
@@ -136,6 +147,6 @@ func TestFSM_Restore(t *testing.T) {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
 
-	err = fsm.store.Acquire([]byte(c.Key), time.Now().UTC().Add(time.Second*10))
+	err = fsm.store.Acquire([]byte(acquireCommand1.Key), time.Now().UTC().Add(time.Second*10))
 	require.Error(t, err)
 }
