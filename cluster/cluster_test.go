@@ -289,3 +289,45 @@ func TestUpdateServiceEndpointSlice(t *testing.T) {
 		})
 	}
 }
+
+func TestLeaderChanged(t *testing.T) {
+
+	cluster := Cluster{
+		namespace:        "default",
+		serviceName:      "test-service",
+		httpAddr:         "8080",
+		ip:               "192.168.1.1",
+		hostname:         "test-host",
+		logger:           &logrus.Logger{},
+		serviceDiscovery: createMockServiceDiscoverySRV(),
+	}
+	inClusterConfig := mockInClusterConfig
+
+	client := fake.NewSimpleClientset()
+	client.DiscoveryV1().EndpointSlices("default").Create(context.TODO(), &discoveryv1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-service",
+			Namespace: "default",
+		},
+	}, metav1.CreateOptions{})
+
+	cluster.clientset = client
+	cluster.inClusterConfigFunc = inClusterConfig
+
+	cluster.LeaderChanged(true)
+
+	actions := client.Actions()
+
+	assert.Equal(t, 3, len(actions))
+	assert.Equal(t, "endpointslices", actions[0].GetResource().Resource)
+	assert.Equal(t, "create", actions[0].GetVerb())
+	assert.Equal(t, cluster.namespace, actions[0].GetNamespace())
+
+	assert.Equal(t, "endpointslices", actions[1].GetResource().Resource)
+	assert.Equal(t, "delete", actions[1].GetVerb())
+	assert.Equal(t, cluster.namespace, actions[1].GetNamespace())
+
+	assert.Equal(t, "endpointslices", actions[2].GetResource().Resource)
+	assert.Equal(t, "create", actions[2].GetVerb())
+	assert.Equal(t, cluster.namespace, actions[2].GetNamespace())
+}
