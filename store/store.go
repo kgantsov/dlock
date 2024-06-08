@@ -38,9 +38,11 @@ type Store struct {
 	ServerID raft.ServerID
 
 	mu    sync.Mutex
-	store *badgerdb.BadgerStore
+	store badgerdb.Store
 
 	leaderChangeFn func(bool)
+
+	valueLogGCInterval time.Duration
 
 	raft *raft.Raft // The consensus mechanism
 
@@ -50,8 +52,9 @@ type Store struct {
 // New returns a new Store.
 func New(logger *logrus.Logger) *Store {
 	return &Store{
-		logger:         logger,
-		leaderChangeFn: func(bool) {},
+		logger:             logger,
+		leaderChangeFn:     func(bool) {},
+		valueLogGCInterval: 5 * time.Minute,
 	}
 }
 
@@ -227,20 +230,18 @@ func (s *Store) Join(nodeID, addr string) error {
 }
 
 func (s *Store) RunValueLogGC() {
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
+	ticker := time.NewTicker(s.valueLogGCInterval)
+	defer ticker.Stop()
 
-		s.logger.Debug("Started running value GC")
+	s.logger.Debug("Started running value GC")
 
-		for range ticker.C {
-			locks := s.store.Locks()
-			s.logger.Debugf("Running value GC. Locks found: %d", len(locks))
-		again:
-			err := s.store.RunValueLogGC(0.7)
-			if err == nil {
-				goto again
-			}
+	for range ticker.C {
+		locks := s.store.Locks()
+		s.logger.Debugf("Running value GC. Locks found: %d", len(locks))
+	again:
+		err := s.store.RunValueLogGC(0.7)
+		if err == nil {
+			goto again
 		}
-	}()
+	}
 }

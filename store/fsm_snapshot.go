@@ -8,7 +8,7 @@ import (
 
 type FSMSnapshot struct {
 	path   string
-	store  *badgerdb.BadgerStore
+	store  badgerdb.Store
 	logger *logrus.Logger
 }
 
