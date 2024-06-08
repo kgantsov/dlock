@@ -61,7 +61,7 @@ func TestCluster_InitError(t *testing.T) {
 
 	serviceDiscovery = createMockServiceDiscoverySRV()
 	serviceDiscovery.lookupIPFn = func(host string) ([]string, error) {
-		return nil, errors.New("Error getting IP")
+		return nil, IPError
 	}
 
 	c = NewCluster(
