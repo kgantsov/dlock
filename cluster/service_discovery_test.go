@@ -18,8 +18,8 @@ func TestServiceDiscoverySRV_Lookup(t *testing.T) {
 
 	hosts, err := s.Lookup()
 
-	assert.Nil(t, err)
-	assert.Equal(t, 1, len(hosts))
+	assert.NoError(t, err)
+	assert.Len(t, hosts, 1)
 	assert.Equal(t, "test-target:1234", hosts[0])
 }
 
@@ -32,7 +32,7 @@ func TestServiceDiscoverySRV_IP(t *testing.T) {
 
 	ip, err := s.IP()
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "test-ip", ip)
 }
 
@@ -45,6 +45,6 @@ func TestServiceDiscoverySRV_Hostname(t *testing.T) {
 
 	hostname, err := s.Hostname()
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "test-hostname", hostname)
 }

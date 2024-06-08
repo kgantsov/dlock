@@ -35,10 +35,10 @@ func testRaftLog(idx uint64, data string) *raft.Log {
 func TestBadgerStore_Implements(t *testing.T) {
 	var store interface{} = &BadgerStore{}
 	_, ok := store.(raft.StableStore)
-	assert.Equal(t, true, ok)
+	assert.True(t, ok)
 
 	_, ok = store.(raft.LogStore)
-	assert.Equal(t, true, ok)
+	assert.True(t, ok)
 }
 
 func TestBadgerStore_FirstIndex(t *testing.T) {
@@ -339,5 +339,5 @@ func TestBadgerStore_Locks(t *testing.T) {
 
 	locks := store.Locks()
 
-	assert.Equal(t, 3, len(locks))
+	assert.Len(t, locks, 3)
 }

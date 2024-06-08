@@ -33,7 +33,7 @@ func TestCluster_Init(t *testing.T) {
 
 	err := c.Init()
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, "dlock-2", c.hostname)
 	assert.Equal(t, "51.11.1.2", c.ip)
 	assert.Equal(t, []string{"dlock-0:8000", "dlock-1:8000"}, c.hosts)
@@ -57,7 +57,7 @@ func TestCluster_InitError(t *testing.T) {
 
 	err := c.Init()
 
-	assert.Error(t, SRVError, err)
+	assert.ErrorIs(t, SRVError, err)
 
 	serviceDiscovery = createMockServiceDiscoverySRV()
 	serviceDiscovery.lookupIPFn = func(host string) ([]string, error) {
@@ -71,7 +71,7 @@ func TestCluster_InitError(t *testing.T) {
 
 	err = c.Init()
 
-	assert.Error(t, IPError, err)
+	assert.ErrorIs(t, IPError, err)
 
 	serviceDiscovery = createMockServiceDiscoverySRV()
 	serviceDiscovery.lookupHostnameFn = func() (string, error) {
@@ -85,7 +85,7 @@ func TestCluster_InitError(t *testing.T) {
 
 	err = c.Init()
 
-	assert.Error(t, HostnameError, err)
+	assert.ErrorIs(t, HostnameError, err)
 }
 
 // TestCluster_NodeID tests the NodeID method of the Cluster
@@ -101,7 +101,7 @@ func TestCluster_NodeID(t *testing.T) {
 	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "dlock-0:8000", c.NodeID())
 
@@ -115,7 +115,7 @@ func TestCluster_NodeID(t *testing.T) {
 	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "dlock-2:8000", c.NodeID())
 }
@@ -133,7 +133,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "dlock-0:12000", c.RaftAddr())
 
@@ -147,7 +147,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	c.inClusterConfigFunc = mockInClusterConfig
 
 	err = c.Init()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, "dlock-2:12000", c.RaftAddr())
 }
@@ -162,7 +162,7 @@ func TestCluster_Hosts(t *testing.T) {
 	c.inClusterConfigFunc = mockInClusterConfig
 
 	err := c.Init()
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 
 	assert.Equal(t, []string{"dlock-0:8000", "dlock-1:8000"}, c.Hosts())
 }
@@ -318,7 +318,7 @@ func TestLeaderChanged(t *testing.T) {
 
 	actions := client.Actions()
 
-	assert.Equal(t, 3, len(actions))
+	assert.Len(t, actions, 3)
 	assert.Equal(t, "endpointslices", actions[0].GetResource().Resource)
 	assert.Equal(t, "create", actions[0].GetVerb())
 	assert.Equal(t, cluster.namespace, actions[0].GetNamespace())

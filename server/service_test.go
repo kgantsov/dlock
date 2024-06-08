@@ -225,8 +225,8 @@ func TestJoin(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, successOutput.ID, "dlock-node-0")
-	assert.Equal(t, successOutput.Addr, "localhost:12001")
+	assert.Equal(t, "dlock-node-0", successOutput.ID)
+	assert.Equal(t, "localhost:12001", successOutput.Addr)
 }
 
 type testStore struct {

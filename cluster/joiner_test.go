@@ -33,7 +33,7 @@ func TestJoiner(t *testing.T) {
 	hosts := []string{host}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	assert.NotEqual(t, nil, j)
+	assert.NotNil(t, j)
 
 	err := j.Join()
 	require.NoError(t, err)
@@ -85,7 +85,7 @@ func TestJoinerRetry(t *testing.T) {
 	hosts := []string{host1, host2}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	assert.NotEqual(t, nil, j)
+	assert.NotNil(t, j)
 
 	err := j.Join()
 	require.NoError(t, err)
@@ -98,11 +98,11 @@ func TestJoinerNoHosts(t *testing.T) {
 	hosts := []string{}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	assert.NotEqual(t, nil, j)
+	assert.NotNil(t, j)
 
 	err := j.Join()
 
-	assert.Equal(t, nil, err)
+	assert.NoError(t, err)
 }
 
 func TestJoinerHostsUnavailable(t *testing.T) {
@@ -112,7 +112,7 @@ func TestJoinerHostsUnavailable(t *testing.T) {
 	hosts := []string{"host1", "host2"}
 	j := NewJoiner(log, "node0", "raftAddr", hosts)
 
-	assert.NotEqual(t, nil, j)
+	assert.NotNil(t, j)
 
 	err := j.Join()
 
