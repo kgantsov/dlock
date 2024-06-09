@@ -108,20 +108,9 @@ func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
 	require.NoError(t, err)
 }
 
-// MockStore is a mock implementation of the store interface
 type MockStore struct {
 	mock.Mock
 }
-
-// func (m *MockStore) Locks() []int {
-// 	args := m.Called()
-// 	return args.Get(0).([]int)
-// }
-
-// func (m *MockStore) RunValueLogGC(discardRatio float64) error {
-// 	args := m.Called(discardRatio)
-// 	return args.Error(0)
-// }
 
 func (m *MockStore) Close() error {
 	args := m.Called()
@@ -194,19 +183,6 @@ func (m *MockStore) Size() (lsm, vlog int64) {
 func (m *MockStore) Locks() []string {
 	args := m.Called()
 	return args.Get(0).([]string)
-}
-
-// MockLogger is a mock implementation of the logger interface
-type MockLogger struct {
-	mock.Mock
-}
-
-func (m *MockLogger) Debug(msg string) {
-	m.Called(msg)
-}
-
-func (m *MockLogger) Debugf(format string, args ...interface{}) {
-	m.Called(format, args)
 }
 
 func TestRunValueLogGC(t *testing.T) {
