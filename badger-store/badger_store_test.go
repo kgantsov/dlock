@@ -369,10 +369,8 @@ func TestRunValueLogGC(t *testing.T) {
 	defer store.Close()
 	defer os.Remove(store.path)
 
-	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Millisecond*1))
+	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Millisecond*200))
 	require.NoError(t, err)
-
-	time.Sleep(1 * time.Second)
 
 	err = store.RunValueLogGC(0.5)
 	require.Equal(t, badger.ErrNoRewrite, err)
