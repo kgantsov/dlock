@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -340,4 +341,39 @@ func TestBadgerStore_Locks(t *testing.T) {
 	locks := store.Locks()
 
 	assert.Len(t, locks, 3)
+}
+
+// TestSize tests that the Size method returns the correct size
+func TestSize(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	lsm, vlog := store.Size()
+
+	assert.Equal(t, int64(0), lsm)
+	assert.Equal(t, int64(0), vlog)
+
+	err := store.Set([]byte("foo"), []byte("bar"))
+	require.NoError(t, err)
+
+	lsm, vlog = store.Size()
+
+	assert.Equal(t, int64(0), lsm)
+	assert.Equal(t, int64(0), vlog)
+}
+
+// TestRunValueLogGC tests that the RunValueLogGC method works as expected
+func TestRunValueLogGC(t *testing.T) {
+	store := testBadgerStore(t)
+	defer store.Close()
+	defer os.Remove(store.path)
+
+	err := store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Millisecond*1))
+	require.NoError(t, err)
+
+	time.Sleep(1 * time.Second)
+
+	err = store.RunValueLogGC(0.5)
+	require.Equal(t, badger.ErrNoRewrite, err)
 }
