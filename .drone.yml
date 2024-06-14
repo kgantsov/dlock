@@ -26,6 +26,9 @@ steps:
 
 - name: build
   image: golang:1.22.2
+  volumes:
+  - name: deps
+    path: /go
   commands:
     - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o dist/dlock .
   when:
