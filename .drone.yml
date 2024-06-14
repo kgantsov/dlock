@@ -30,7 +30,14 @@ steps:
   - name: deps
     path: /go
   commands:
-    - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o dlock cmd/server/main.go
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - tar -czf dlock.linux-amd64.tar.gz dist/dlock
+    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - tar -czf dlock.linux-arm64.tar.gz dist/dlock
+    - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - tar -czf dlock.darwin-amd64.tar.gz dist/dlock
+    - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - tar -czf dlock.darwin-arm64.tar.gz dist/dlock
   when:
     event:
       - tag
@@ -43,7 +50,7 @@ steps:
   settings:
     api_key:
       from_secret: github_token
-    files: dlock
+    files: dist/*
   when:
     event:
       - tag
