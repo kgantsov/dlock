@@ -30,9 +30,9 @@ steps:
   - name: deps
     path: /go
   commands:
-    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o dist/dlock cmd/server/main.go
     - tar -czf dist/dlock-${DRONE_TAG##v}-linux-amd64.tar.gz dist/dlock
-    - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
+    - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o dist/dlock cmd/server/main.go
     - tar -czf dist/dlock-${DRONE_TAG##v}-darwin-arm64.tar.gz dist/dlock
     - rm -f dist/dlock
   when:

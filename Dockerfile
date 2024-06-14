@@ -7,7 +7,7 @@ COPY ./ ./
 RUN go mod download
 WORKDIR $GOPATH/src/github.com/kgantsov/dlock/
 WORKDIR $GOPATH/src/github.com/kgantsov/dlock/cmd/server
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o /app .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app .
 
 FROM alpine:latest as alpine
 RUN apk --no-cache add tzdata zip ca-certificates
