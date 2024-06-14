@@ -28,9 +28,9 @@ steps:
   image: golang:1.22.2
   volumes:
   - name: deps
-    path: /go/cmd/server
+    path: /go
   commands:
-    - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o dlock .
+    - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o dlock cmd/server/main.go
   when:
     event:
       - tag
@@ -39,7 +39,7 @@ steps:
   image: plugins/github-release
   volumes:
   - name: deps
-    path: /go/cmd/server
+    path: /go
   settings:
     api_key:
       from_secret: github_token
@@ -59,7 +59,6 @@ steps:
     context: .
     dockerfile: ./Dockerfile
     auto_tag: true
-
 
 volumes:
 - name: deps
