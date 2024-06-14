@@ -24,6 +24,24 @@ steps:
       exclude:
       - tag
 
+- name: build
+  image: golang:1.22.2
+  commands:
+    - CGO_ENABLED=0 GOOS=linux go build -a -installsuffix nocgo -o dist/dlock .
+  when:
+    event:
+      - tag
+
+- name: publish
+  image: plugins/github-release
+  settings:
+    api_key:
+      from_secret: github_token
+    files: dist/*
+  when:
+    event:
+      - tag
+
 - name: build and push the service
   image: plugins/docker
   settings:
