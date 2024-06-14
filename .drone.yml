@@ -33,13 +33,13 @@ steps:
     path: /go
   commands:
     - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dlock-${TAG_NAME}-linux-amd64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${TAG_NAME}-linux-amd64.tar.gz dist/dlock
     - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dlock-${TAG_NAME}-linux-arm64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${TAG_NAME}-linux-arm64.tar.gz dist/dlock
     - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dlock-${TAG_NAME}-darwin-amd64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${TAG_NAME}-darwin-amd64.tar.gz dist/dlock
     - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dlock-${TAG_NAME}-darwin-arm64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${TAG_NAME}-darwin-arm64.tar.gz dist/dlock
     - rm -f dist/dlock
   when:
     event:
