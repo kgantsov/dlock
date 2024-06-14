@@ -26,20 +26,14 @@ steps:
 
 - name: build
   image: golang:1.22.2
-  environment:
-    TAG_NAME: ${DRONE_TAG}
   volumes:
   - name: deps
     path: /go
   commands:
     - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dist/dlock-${TAG_NAME}-linux-amd64.tar.gz dist/dlock
-    - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dist/dlock-${TAG_NAME}-linux-arm64.tar.gz dist/dlock
-    - CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dist/dlock-${TAG_NAME}-darwin-amd64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${DRONE_TAG##v}-linux-amd64.tar.gz dist/dlock
     - CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -a -installsuffix nocgo -o dist/dlock cmd/server/main.go
-    - tar -czf dist/dlock-${TAG_NAME}-darwin-arm64.tar.gz dist/dlock
+    - tar -czf dist/dlock-${DRONE_TAG##v}-darwin-arm64.tar.gz dist/dlock
     - rm -f dist/dlock
   when:
     event:
