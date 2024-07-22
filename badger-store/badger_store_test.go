@@ -8,7 +8,6 @@ import (
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -20,7 +19,7 @@ func testBadgerStore(t testing.TB) *BadgerStore {
 	os.Remove(dirname)
 
 	// Successfully creates and returns a store
-	store, err := NewBadgerStore(&logrus.Logger{}, dirname)
+	store, err := NewBadgerStore(dirname)
 	require.NoError(t, err)
 
 	return store

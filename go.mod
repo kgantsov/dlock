@@ -9,6 +9,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.1
 	github.com/hashicorp/go-msgpack/v2 v2.1.1
 	github.com/hashicorp/raft v1.6.1
+	github.com/rs/zerolog v1.33.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/stretchr/testify v1.9.0
 	k8s.io/api v0.30.1

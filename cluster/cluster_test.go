@@ -6,7 +6,6 @@ import (
 	"net"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -27,7 +26,7 @@ func TestCluster_Init(t *testing.T) {
 	serviceDiscovery := createMockServiceDiscoverySRV()
 
 	c := NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -51,7 +50,7 @@ func TestCluster_InitError(t *testing.T) {
 	}
 
 	c := NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -65,7 +64,7 @@ func TestCluster_InitError(t *testing.T) {
 	}
 
 	c = NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -79,7 +78,7 @@ func TestCluster_InitError(t *testing.T) {
 	}
 
 	c = NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -96,7 +95,7 @@ func TestCluster_NodeID(t *testing.T) {
 	}
 
 	c := NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -110,7 +109,7 @@ func TestCluster_NodeID(t *testing.T) {
 	}
 
 	c = NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -128,7 +127,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	}
 
 	c := NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -142,7 +141,7 @@ func TestCluster_RaftAddr(t *testing.T) {
 	}
 
 	c = NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -157,7 +156,7 @@ func TestCluster_Hosts(t *testing.T) {
 	serviceDiscovery := createMockServiceDiscoverySRV()
 
 	c := NewCluster(
-		&logrus.Logger{}, serviceDiscovery, "test-namespace", "dlock", "8000",
+		serviceDiscovery, "test-namespace", "dlock", "8000",
 	)
 	c.inClusterConfigFunc = mockInClusterConfig
 
@@ -204,7 +203,6 @@ func TestInitKubeClient(t *testing.T) {
 				httpAddr:    "8080",
 				ip:          "192.168.1.1",
 				hostname:    "test-host",
-				logger:      &logrus.Logger{},
 			},
 			inClusterConfig: mockInClusterConfig,
 			expectedErr:     "",
@@ -217,7 +215,6 @@ func TestInitKubeClient(t *testing.T) {
 				httpAddr:    "8080",
 				ip:          "192.168.1.1",
 				hostname:    "test-host",
-				logger:      &logrus.Logger{},
 			},
 			inClusterConfig: mockInClusterConfigError,
 			expectedErr:     "in-cluster config error",
@@ -256,7 +253,6 @@ func TestUpdateServiceEndpointSlice(t *testing.T) {
 				httpAddr:    "8080",
 				ip:          "192.168.1.1",
 				hostname:    "test-host",
-				logger:      &logrus.Logger{},
 			},
 			inClusterConfig: mockInClusterConfig,
 			setupClient: func() *fake.Clientset {
@@ -298,7 +294,6 @@ func TestLeaderChanged(t *testing.T) {
 		httpAddr:         "8080",
 		ip:               "192.168.1.1",
 		hostname:         "test-host",
-		logger:           &logrus.Logger{},
 		serviceDiscovery: createMockServiceDiscoverySRV(),
 	}
 	inClusterConfig := mockInClusterConfig

@@ -7,8 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/sirupsen/logrus"
 )
 
 // TestJoiner tests the Joiner.
@@ -27,11 +25,8 @@ func TestJoiner(t *testing.T) {
 	// get host name and port from server.URL
 	host := server.URL[len("http://"):]
 
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	hosts := []string{host}
-	j := NewJoiner(log, "node0", "raftAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -79,11 +74,8 @@ func TestJoinerRetry(t *testing.T) {
 	host1 := server1.URL[len("http://"):]
 	host2 := server2.URL[len("http://"):]
 
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	hosts := []string{host1, host2}
-	j := NewJoiner(log, "node0", "raftAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -92,11 +84,8 @@ func TestJoinerRetry(t *testing.T) {
 }
 
 func TestJoinerNoHosts(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	hosts := []string{}
-	j := NewJoiner(log, "node0", "raftAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -106,11 +95,8 @@ func TestJoinerNoHosts(t *testing.T) {
 }
 
 func TestJoinerHostsUnavailable(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	hosts := []string{"host1", "host2"}
-	j := NewJoiner(log, "node0", "raftAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 

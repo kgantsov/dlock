@@ -11,7 +11,6 @@ import (
 
 	"github.com/hashicorp/raft"
 	badgerdb "github.com/kgantsov/dlock/badger-store"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -63,14 +62,13 @@ func (m *MemorySnapshotSink) Read(p []byte) (n int, err error) {
 }
 func TestFSM_Snapshot(t *testing.T) {
 	// Initialize the FSM with a test store
-	logger := &logrus.Logger{}
-	store, err := badgerdb.New(logger, badgerdb.Options{
+	store, err := badgerdb.New(badgerdb.Options{
 		Path: "/tmp/testdb",
 	})
 	require.NoError(t, err)
 	defer os.RemoveAll("/tmp/testdb") // Clean up
 
-	fsm := &FSM{store: store, logger: logger}
+	fsm := &FSM{store: store}
 
 	// Apply some commands to the FSM
 	fsm.Apply(&raft.Log{Data: []byte(`{"Op": "acquire", "Key": "key1", "Time": "2023-06-01T12:00:00Z"}`)})
@@ -86,14 +84,13 @@ func TestFSM_Snapshot(t *testing.T) {
 
 func TestFSM_Restore(t *testing.T) {
 	// Initialize the FSM with a test store
-	logger := &logrus.Logger{}
-	store, err := badgerdb.New(logger, badgerdb.Options{
+	store, err := badgerdb.New(badgerdb.Options{
 		Path: "/tmp/testdb",
 	})
 	require.NoError(t, err)
 	defer os.RemoveAll("/tmp/testdb") // Clean up
 
-	fsm := &FSM{store: store, logger: logger}
+	fsm := &FSM{store: store}
 
 	// Apply some commands to the FSM
 	acquireCommand1 := &command{
@@ -133,7 +130,7 @@ func TestFSM_Restore(t *testing.T) {
 	require.NoError(t, err)
 
 	// Reinitialize the store for restore
-	restoreStore, err := badgerdb.New(&logrus.Logger{}, badgerdb.Options{
+	restoreStore, err := badgerdb.New(badgerdb.Options{
 		Path: "/tmp/newtestdb",
 	})
 	require.NoError(t, err)

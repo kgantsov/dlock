@@ -17,11 +17,10 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	logger := logrus.New()
 	addr := "8080"
 	store := newTestStore()
 
-	service := New(logger, addr, store)
+	service := New(addr, store)
 
 	assert.NotNil(t, service)
 	assert.NotNil(t, service.router)

@@ -9,25 +9,21 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 type Joiner struct {
 	nodeID   string
 	raftAddr string
 	hosts    []string
-
-	logger *logrus.Logger
 }
 
-func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *Joiner {
-	logger.Debugf("Creating new joiner: %s %s %v", nodeID, raftAddr, hosts)
+func NewJoiner(nodeID, raftAddr string, hosts []string) *Joiner {
+	log.Debug().Msgf("Creating new joiner: %s %s %v", nodeID, raftAddr, hosts)
 	j := &Joiner{
 		nodeID:   nodeID,
 		raftAddr: raftAddr,
 		hosts:    hosts,
-
-		logger: logger,
 	}
 
 	return j
@@ -35,7 +31,7 @@ func NewJoiner(logger *logrus.Logger, nodeID, raftAddr string, hosts []string) *
 
 func (j *Joiner) Join() error {
 	if len(j.hosts) == 0 {
-		j.logger.Debugf("There is no hosts to join: %d", len(j.hosts))
+		log.Debug().Msgf("There is no hosts to join: %d", len(j.hosts))
 		return nil
 	}
 
@@ -44,7 +40,7 @@ func (j *Joiner) Join() error {
 
 	for i := 0; i < 3; i++ {
 		for _, host = range j.hosts {
-			j.logger.Debugf("Trying to join: %s", host)
+			log.Debug().Msgf("Trying to join: %s", host)
 
 			if err = j.join(host, j.raftAddr, j.nodeID); err == nil {
 				return nil
@@ -80,6 +76,6 @@ func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
-	j.logger.Infof("JOINED %+v %+v", resp.StatusCode, string(body))
+	log.Info().Msgf("JOINED %+v %+v", resp.StatusCode, string(body))
 	return nil
 }

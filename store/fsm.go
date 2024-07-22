@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
+	"github.com/rs/zerolog/log"
 )
 
 type FSM Store
@@ -19,7 +20,7 @@ type FSMResponse struct {
 
 // Apply applies a Raft log entry to the key-value store.
 func (f *FSM) Apply(l *raft.Log) interface{} {
-	f.logger.Debugf("Apply log: %v", l)
+	log.Debug().Msgf("Apply log: %v", l)
 
 	var c command
 	if err := json.Unmarshal(l.Data, &c); err != nil {
@@ -41,7 +42,7 @@ func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	snapshot := &FSMSnapshot{path: f.store.DBPath(), store: f.store, logger: f.logger}
+	snapshot := &FSMSnapshot{path: f.store.DBPath(), store: f.store}
 	return snapshot, nil
 }
 
@@ -55,14 +56,14 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	scanner := bufio.NewScanner(rc)
 	linesTotal := 0
 	linesRestored := 0
-	f.logger.Debugf("Restoring snapshot")
+	log.Debug().Msgf("Restoring snapshot")
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		linesTotal++
 
 		var c command
 		if err := json.Unmarshal(line, &c); err != nil {
-			f.logger.Warnf("Failed to unmarshal command: %v %v", err, line)
+			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, line)
 			continue
 		}
 
@@ -80,16 +81,16 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 				f.store.Release([]byte(c.Key))
 				linesRestored++
 			default:
-				f.logger.Warnf("Unrecognized command op: %s", c.Op)
+				log.Warn().Msgf("Unrecognized command op: %s", c.Op)
 			}
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		f.logger.Infof("Error while reading snapshot: %v. Restored %d out of %d lines", err, linesRestored, linesTotal)
+		log.Info().Msgf("Error while reading snapshot: %v. Restored %d out of %d lines", err, linesRestored, linesTotal)
 		return err
 	}
 
-	f.logger.Infof("Restored %d out of %d lines", linesRestored, linesTotal)
+	log.Info().Msgf("Restored %d out of %d lines", linesRestored, linesTotal)
 
 	return nil
 }

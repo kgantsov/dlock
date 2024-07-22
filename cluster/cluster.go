@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 	discoveryv1 "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -27,16 +27,13 @@ type Cluster struct {
 
 	clientset           kubernetes.Interface
 	inClusterConfigFunc func() (*rest.Config, error)
-
-	logger *logrus.Logger
 }
 
-func NewCluster(logger *logrus.Logger, serviceDiscovery ServiceDiscovery, namespace, ServiceName, httpAddr string) *Cluster {
+func NewCluster(serviceDiscovery ServiceDiscovery, namespace, ServiceName, httpAddr string) *Cluster {
 	c := &Cluster{
 		namespace:           namespace,
 		serviceName:         ServiceName,
 		httpAddr:            httpAddr,
-		logger:              logger,
 		serviceDiscovery:    serviceDiscovery,
 		inClusterConfigFunc: rest.InClusterConfig,
 	}
@@ -48,24 +45,24 @@ func (c *Cluster) Init() error {
 	var err error
 	c.hostname, err = c.serviceDiscovery.Hostname()
 	if err != nil {
-		c.logger.Warnf("Error getting hostname: %s", err)
+		log.Warn().Msgf("Error getting hostname: %s", err)
 		return err
 	}
 
 	c.ip, err = c.serviceDiscovery.IP()
 	if err != nil {
-		c.logger.Errorf("Couldn't lookup the IP: %v\n", err)
+		log.Error().Msgf("Couldn't lookup the IP: %v\n", err)
 		return err
 	}
 
 	addrs, err := c.serviceDiscovery.Lookup()
 	if err != nil {
-		c.logger.Warningln("Error:", err)
+		log.Warn().Msgf("Error: %s", err)
 		return err
 	}
 
 	for _, addr := range addrs {
-		c.logger.Debugf("Discovered address: %s Current host: %s", addr, c.hostname)
+		log.Debug().Msgf("Discovered address: %s Current host: %s", addr, c.hostname)
 
 		if strings.HasPrefix(addr, c.hostname) {
 			c.nodeID = addr
@@ -76,13 +73,13 @@ func (c *Cluster) Init() error {
 
 	host, _, err := net.SplitHostPort(c.nodeID)
 	if err != nil {
-		c.logger.Warningf("Error splitting host and port: %s %v\n", c.nodeID, err)
+		log.Warn().Msgf("Error splitting host and port: %s %v\n", c.nodeID, err)
 	}
 	c.raftAddr = fmt.Sprintf("%s:12000", host)
 
 	c.InitKubeClient()
 
-	c.logger.Debugf(
+	log.Debug().Msgf(
 		"Current node is %s discovered hosts %+v raftAddr %s",
 		c.nodeID,
 		c.hosts,
@@ -122,15 +119,15 @@ func (c *Cluster) LeaderChanged(isLeader bool) {
 	if isLeader {
 		ip, err := c.serviceDiscovery.IP()
 		if err != nil {
-			c.logger.Errorf("Couldn't lookup the IP: %v\n", err)
+			log.Error().Msgf("Couldn't lookup the IP: %v\n", err)
 		}
 		c.ip = ip
 
-		c.logger.Infof("Leader changed, updating EndpointSlice with IP: %s\n", c.ip)
+		log.Info().Msgf("Leader changed, updating EndpointSlice with IP: %s\n", c.ip)
 
 		err = c.UpdateServiceEndpointSlice()
 		if err != nil {
-			c.logger.Errorf("Failed to update service edpoint sclice: %s", err.Error())
+			log.Error().Msgf("Failed to update service edpoint sclice: %s", err.Error())
 		}
 	}
 }
@@ -190,7 +187,7 @@ func (c *Cluster) UpdateServiceEndpointSlice() error {
 		return err
 	}
 
-	c.logger.Infof("EndpointSlice %s created successfully!\n", createdEndpointSlice.Name)
+	log.Info().Msgf("EndpointSlice %s created successfully!\n", createdEndpointSlice.Name)
 
 	return nil
 }

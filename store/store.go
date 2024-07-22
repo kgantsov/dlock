@@ -15,9 +15,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	"github.com/hashicorp/raft"
 	badgerdb "github.com/kgantsov/dlock/badger-store"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -45,14 +46,11 @@ type Store struct {
 	valueLogGCInterval time.Duration
 
 	raft *raft.Raft // The consensus mechanism
-
-	logger *logrus.Logger
 }
 
 // New returns a new Store.
-func New(logger *logrus.Logger) *Store {
+func New() *Store {
 	return &Store{
-		logger:             logger,
 		leaderChangeFn:     func(bool) {},
 		valueLogGCInterval: 5 * time.Minute,
 	}
@@ -90,7 +88,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Create the log store and stable store.
 	var logStore raft.LogStore
 	var stableStore raft.StableStore
-	badgerDB, err := badgerdb.New(s.logger, badgerdb.Options{
+	badgerDB, err := badgerdb.New(badgerdb.Options{
 		Path: s.RaftDir,
 	})
 	if err != nil {
@@ -127,9 +125,9 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 func (s *Store) ListenToLeaderChanges() {
 	for isLeader := range s.raft.LeaderCh() {
 		if isLeader {
-			s.logger.Infof("Node %s has become a leader", s.ServerID)
+			log.Info().Msgf("Node %s has become a leader", s.ServerID)
 		} else {
-			s.logger.Infof("Node %s lost leadership", s.ServerID)
+			log.Info().Msgf("Node %s lost leadership", s.ServerID)
 		}
 		s.leaderChangeFn(isLeader)
 	}
@@ -195,11 +193,11 @@ func (s *Store) Release(key string) error {
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
 func (s *Store) Join(nodeID, addr string) error {
-	s.logger.Infof("received join request for remote node %s at %s", nodeID, addr)
+	log.Info().Msgf("received join request for remote node %s at %s", nodeID, addr)
 
 	configFuture := s.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
-		s.logger.Errorf("failed to get raft configuration: %v", err)
+		log.Error().Msgf("failed to get raft configuration: %v", err)
 		return err
 	}
 
@@ -210,7 +208,7 @@ func (s *Store) Join(nodeID, addr string) error {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
 			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
-				s.logger.Infof("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
+				log.Info().Msgf("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
 				return nil
 			}
 
@@ -225,7 +223,7 @@ func (s *Store) Join(nodeID, addr string) error {
 	if f.Error() != nil {
 		return f.Error()
 	}
-	s.logger.Infof("node %s at %s joined successfully", nodeID, addr)
+	log.Info().Msgf("node %s at %s joined successfully", nodeID, addr)
 	return nil
 }
 
@@ -233,11 +231,11 @@ func (s *Store) RunValueLogGC() {
 	ticker := time.NewTicker(s.valueLogGCInterval)
 	defer ticker.Stop()
 
-	s.logger.Debug("Started running value GC")
+	log.Debug().Msgf("Started running value GC")
 
 	for range ticker.C {
 		locks := s.store.Locks()
-		s.logger.Debugf("Running value GC. Locks found: %d", len(locks))
+		log.Debug().Msgf("Running value GC. Locks found: %d", len(locks))
 	again:
 		err := s.store.RunValueLogGC(0.7)
 		if err == nil {

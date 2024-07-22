@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,9 +15,7 @@ import (
 
 // TestStoreOpen tests that the store can be opened.
 func TestStoreOpen(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-	s := New(log)
+	s := New()
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
@@ -33,11 +30,8 @@ func TestStoreOpen(t *testing.T) {
 
 // TestStoreOpenSingleNode tests that a command can be applied to the log
 func TestStoreOpenSingleNode(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
 	becomeLeader := false
-	s := New(log)
+	s := New()
 	s.SetLeaderChangeFunc(func(isLeader bool) {
 		if isLeader {
 			becomeLeader = true
@@ -77,10 +71,7 @@ func TestStoreOpenSingleNode(t *testing.T) {
 
 // TestStoreOpenSingleNodeWithTTL tests that a command can be applied to the log
 func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-
-	s := New(log)
+	s := New()
 	tmpDir, _ := ioutil.TempDir("", "store_test")
 	defer os.RemoveAll(tmpDir)
 
@@ -195,7 +186,6 @@ func TestRunValueLogGC(t *testing.T) {
 	// Creating the store with the mocked dependencies
 	s := &Store{
 		store:              mockStore,
-		logger:             &logrus.Logger{},
 		valueLogGCInterval: 5 * time.Millisecond,
 	}
 

@@ -14,8 +14,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
-
-	"github.com/sirupsen/logrus"
 )
 
 // Store is the interface Raft-backed key-value stores must implement.
@@ -39,7 +37,7 @@ type Service struct {
 }
 
 // New returns an uninitialized HTTP service.
-func New(logger *logrus.Logger, addr string, store Store) *Service {
+func New(addr string, store Store) *Service {
 
 	router := fiber.New()
 	api := humafiber.New(
@@ -47,8 +45,7 @@ func New(logger *logrus.Logger, addr string, store Store) *Service {
 	)
 
 	h := &Handler{
-		store:  store,
-		Logger: logger,
+		store: store,
 	}
 	h.ConfigureMiddleware(router)
 	h.RegisterRoutes(api)
@@ -73,7 +70,7 @@ func (h *Handler) ConfigureMiddleware(router *fiber.App) {
 
 	router.Use(requestid.New())
 
-	prometheus := fiberprometheus.New("my-service-name")
+	prometheus := fiberprometheus.New("dlock")
 	prometheus.RegisterAt(router, "/metrics")
 	router.Use(prometheus.Middleware)
 
