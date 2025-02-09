@@ -32,7 +32,7 @@ func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
 	// Default level for this example is info, unless debug flag is present
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(zerolog.WarnLevel)
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 

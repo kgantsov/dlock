@@ -7,6 +7,8 @@ import (
 	"io"
 	"time"
 
+	badgerdb "github.com/kgantsov/dlock/badger-store"
+
 	"github.com/hashicorp/raft"
 	"github.com/rs/zerolog/log"
 )
@@ -61,32 +63,25 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 		line := scanner.Bytes()
 		linesTotal++
 
-		var c command
-		if err := json.Unmarshal(line, &c); err != nil {
+		var lockEntry badgerdb.LockEntry
+		if err := badgerdb.DecodeMsgPack(line, &lockEntry); err != nil {
 			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, line)
 			continue
 		}
 
-		expire, err := time.Parse(time.RFC3339, c.Time)
+		err := f.store.Acquire([]byte(lockEntry.Key), lockEntry.ExpireAt)
 		if err != nil {
 			continue
 		}
-
-		if time.Now().UTC().Before(expire) {
-			switch c.Op {
-			case "acquire":
-				f.store.Acquire([]byte(c.Key), expire)
-				linesRestored++
-			case "release":
-				f.store.Release([]byte(c.Key))
-				linesRestored++
-			default:
-				log.Warn().Msgf("Unrecognized command op: %s", c.Op)
-			}
-		}
+		linesRestored++
 	}
 	if err := scanner.Err(); err != nil {
-		log.Info().Msgf("Error while reading snapshot: %v. Restored %d out of %d lines", err, linesRestored, linesTotal)
+		log.Info().Msgf(
+			"Error while reading snapshot: %v. Restored %d out of %d lines",
+			err,
+			linesRestored,
+			linesTotal,
+		)
 		return err
 	}
 

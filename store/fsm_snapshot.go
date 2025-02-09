@@ -13,7 +13,7 @@ type FSMSnapshot struct {
 }
 
 func (f *FSMSnapshot) Persist(sink raft.SnapshotSink) error {
-	if err := f.store.CopyLogs(sink); err != nil {
+	if err := f.store.PersistSnapshot(sink); err != nil {
 		f.logger.Debug("Error copying logs to sink")
 		sink.Cancel()
 		return err

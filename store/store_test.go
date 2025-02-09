@@ -131,7 +131,7 @@ func (m *MockStore) DeleteRange(min, max uint64) error {
 	args := m.Called(min, max)
 	return args.Error(0)
 }
-func (m *MockStore) CopyLogs(w io.Writer) error {
+func (m *MockStore) PersistSnapshot(w io.Writer) error {
 	args := m.Called(w)
 	return args.Error(0)
 }

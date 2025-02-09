@@ -28,6 +28,11 @@ var (
 	ErrNotAbleToReleaseLock = errors.New("Not able to release a lock")
 )
 
+type LockEntry struct {
+	Key      string
+	ExpireAt time.Time
+}
+
 type Store interface {
 	Close() error
 	FirstIndex() (uint64, error)
@@ -36,7 +41,7 @@ type Store interface {
 	StoreLog(log *raft.Log) error
 	StoreLogs(logs []*raft.Log) error
 	DeleteRange(min, max uint64) error
-	CopyLogs(w io.Writer) error
+	PersistSnapshot(w io.Writer) error
 	Set(k, v []byte) error
 	Get(k []byte) ([]byte, error)
 	Acquire(k []byte, expireAt time.Time) error
@@ -277,7 +282,7 @@ func (b *BadgerStore) DeleteRange(min, max uint64) error {
 	return nil
 }
 
-func (b *BadgerStore) CopyLogs(w io.Writer) error {
+func (b *BadgerStore) PersistSnapshot(w io.Writer) error {
 	txn := b.db.NewTransaction(false)
 	defer txn.Discard()
 
@@ -287,7 +292,7 @@ func (b *BadgerStore) CopyLogs(w io.Writer) error {
 
 	it := txn.NewIterator(opts)
 	defer it.Close()
-	prefix := []byte(dbLogs)
+	prefix := []byte(dbLock)
 	cnt := 0
 
 	for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
@@ -303,19 +308,33 @@ func (b *BadgerStore) CopyLogs(w io.Writer) error {
 			continue
 		}
 
-		raftLog := &raft.Log{}
+		var valueExpireAt time.Time
+		err = valueExpireAt.UnmarshalBinary(val)
 
-		if err := DecodeMsgPack(val, raftLog); err != nil {
-			log.Debug().Msgf("Failed to decode log: %v", err)
+		if err == nil {
+			if time.Now().After(valueExpireAt) {
+				// Skip expired locks
+				continue
+			}
+		}
+
+		lockEntry := LockEntry{
+			Key:      string(key[len(dbLock):]),
+			ExpireAt: valueExpireAt,
+		}
+
+		data, err := EncodeMsgPack(lockEntry, b.msgpackUseNewTimeFormat)
+		if err != nil {
+			log.Debug().Msgf("Error encoding key %s %v %v", key[:len(dbLogs)], lockEntry, err)
 			continue
 		}
 
-		if _, err := w.Write(raftLog.Data); err != nil {
-			log.Debug().Msgf("Error writing key %s %d %v", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]), err)
+		if _, err := w.Write(data.Bytes()); err != nil {
+			log.Debug().Msgf("Error writing key %s %v %v", key[:len(dbLogs)], lockEntry, err)
 			continue
 		}
 		if _, err := w.Write([]byte("\n")); err != nil {
-			log.Debug().Msgf("Error writing key %s %d", key[:len(dbLogs)], bytesToUint64(key[len(dbLogs):]))
+			log.Debug().Msgf("Error writing key %s %v", key[:len(dbLogs)], lockEntry)
 			continue
 		}
 		cnt += 1

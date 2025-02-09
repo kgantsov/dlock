@@ -2,7 +2,6 @@ package store
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"os"
 	"sync"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/hashicorp/raft"
 	badgerdb "github.com/kgantsov/dlock/badger-store"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -92,24 +90,19 @@ func TestFSM_Restore(t *testing.T) {
 
 	fsm := &FSM{store: store}
 
-	// Apply some commands to the FSM
-	acquireCommand1 := &command{
-		Op:   "acquire",
-		Key:  "test-lock-1",
-		Time: time.Now().UTC().Add(time.Second * time.Duration(10)).Format(time.RFC3339),
-	}
-	acquireCommand1Binary, _ := json.Marshal(acquireCommand1)
-	releaseCommand1 := &command{
-		Op:   "release",
-		Key:  "test-lock-2",
-		Time: time.Now().UTC().Add(time.Second * time.Duration(10)).Format(time.RFC3339),
-	}
-	releaseCommand1Binary, _ := json.Marshal(releaseCommand1)
+	err = store.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
+	require.NoError(t, err)
 
-	err = store.StoreLogs([]*raft.Log{
-		{Index: 1, Term: 1, Data: releaseCommand1Binary},
-		{Index: 2, Term: 1, Data: acquireCommand1Binary},
-	})
+	err = store.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
+	require.NoError(t, err)
+
+	err = store.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
+	require.NoError(t, err)
+
+	err = store.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Millisecond))
+	require.NoError(t, err)
+
+	err = store.Release([]byte("test-lock-1"))
 	require.NoError(t, err)
 
 	// Create a snapshot
@@ -120,10 +113,6 @@ func TestFSM_Restore(t *testing.T) {
 	sink := NewMemorySnapshotSink("test-snapshot-id")
 	err = snapshot.Persist(sink)
 	require.NoError(t, err)
-
-	assert.Equal(
-		t, string(releaseCommand1Binary)+"\n"+string(acquireCommand1Binary)+"\n", sink.buf.String(),
-	)
 
 	// Close the current store and restore from the snapshot
 	err = fsm.store.Close()
@@ -144,6 +133,15 @@ func TestFSM_Restore(t *testing.T) {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
 
-	err = fsm.store.Acquire([]byte(acquireCommand1.Key), time.Now().UTC().Add(time.Second*10))
+	err = fsm.store.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
+	require.NoError(t, err)
+
+	err = fsm.store.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
 	require.Error(t, err)
+
+	err = fsm.store.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
+	require.Error(t, err)
+
+	err = fsm.store.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Second*10))
+	require.NoError(t, err)
 }
