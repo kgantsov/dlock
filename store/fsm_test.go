@@ -81,12 +81,13 @@ func TestFSM_Snapshot(t *testing.T) {
 }
 
 func TestFSM_Restore(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "db*")
+	defer os.RemoveAll(tmpDir)
 	// Initialize the FSM with a test store
 	store, err := badgerdb.New(badgerdb.Options{
-		Path: "/tmp/testdb",
+		Path: tmpDir,
 	})
 	require.NoError(t, err)
-	defer os.RemoveAll("/tmp/testdb") // Clean up
 
 	fsm := &FSM{store: store}
 
@@ -118,9 +119,11 @@ func TestFSM_Restore(t *testing.T) {
 	err = fsm.store.Close()
 	require.NoError(t, err)
 
+	tmpDir2, _ := os.MkdirTemp("", "db*")
+	defer os.RemoveAll(tmpDir2)
 	// Reinitialize the store for restore
 	restoreStore, err := badgerdb.New(badgerdb.Options{
-		Path: "/tmp/newtestdb",
+		Path: tmpDir2,
 	})
 	require.NoError(t, err)
 	fsm.store = restoreStore

@@ -58,14 +58,14 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	scanner := bufio.NewScanner(rc)
 	linesTotal := 0
 	linesRestored := 0
-	log.Debug().Msgf("Restoring snapshot")
+	log.Debug().Msgf("Restoring snapshot!@")
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		linesTotal++
 
 		var lockEntry badgerdb.LockEntry
-		if err := badgerdb.DecodeMsgPack(line, &lockEntry); err != nil {
-			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, line)
+		if err := json.Unmarshal(line, &lockEntry); err != nil {
+			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, string(line))
 			continue
 		}
 

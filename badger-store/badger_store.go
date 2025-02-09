@@ -1,6 +1,7 @@
 package badgerstore
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"time"
@@ -323,13 +324,13 @@ func (b *BadgerStore) PersistSnapshot(w io.Writer) error {
 			ExpireAt: valueExpireAt,
 		}
 
-		data, err := EncodeMsgPack(lockEntry, b.msgpackUseNewTimeFormat)
+		data, err := json.Marshal(lockEntry)
 		if err != nil {
 			log.Debug().Msgf("Error encoding key %s %v %v", key[:len(dbLogs)], lockEntry, err)
 			continue
 		}
 
-		if _, err := w.Write(data.Bytes()); err != nil {
+		if _, err := w.Write(data); err != nil {
 			log.Debug().Msgf("Error writing key %s %v %v", key[:len(dbLogs)], lockEntry, err)
 			continue
 		}
