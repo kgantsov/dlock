@@ -1,5 +1,6 @@
 # dlock [![Build Status](https://drone.coroutine.dev/api/badges/kgantsov/dlock/status.svg)](https://drone.coroutine.dev/kgantsov/dlock) [![codecov](https://codecov.io/gh/kgantsov/dlock/graph/badge.svg?token=PQHO5EUSG7)](https://codecov.io/gh/kgantsov/dlock)
-`dlock` is yet another distibuted lock based on the Raft consensus algorithm.
+`dlock` is yet another distibuted lock based on the Raft consensus algorithm by
+[hashicorp/raft](https://github.com/hashicorp/raft) and [BadgerDB](https://dgraph.io/blog/post/badger/).
 
 The Raft consensus algorithm is a protocol for managing a replicated log across a distributed system to ensure consistency and reliability. Raft is designed to be understandable and practical, offering a robust solution to the consensus problem, which is fundamental for building fault-tolerant distributed systems. 
 
