@@ -96,7 +96,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 		huma.Operation{
 			OperationID: "acquire-lock",
 			Method:      http.MethodPost,
-			Path:        "/API/v1/locks/:key",
+			Path:        "/API/v1/locks/{key}",
 			Summary:     "Acquire lock",
 			Description: "An endpoint that is used for acquiring a lock",
 			Tags:        []string{"Locks"},
@@ -108,7 +108,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 		huma.Operation{
 			OperationID: "release-lock",
 			Method:      http.MethodDelete,
-			Path:        "/API/v1/locks/:key",
+			Path:        "/API/v1/locks/{key}",
 			Summary:     "Release lock",
 			Description: "An endpoint that is used for releasing a lock",
 			Tags:        []string{"Locks"},
