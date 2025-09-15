@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	badgerdb "github.com/kgantsov/dlock/badger-store"
+	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
 	"github.com/stretchr/testify/require"
 )
 

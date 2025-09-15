@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	badgerdb "github.com/kgantsov/dlock/badger-store"
+	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
 
 	"github.com/hashicorp/raft"
 	"github.com/rs/zerolog/log"

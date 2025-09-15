@@ -10,9 +10,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
-	cluster "github.com/kgantsov/dlock/cluster"
-	server "github.com/kgantsov/dlock/server"
-	"github.com/kgantsov/dlock/store"
+	cluster "github.com/kgantsov/dlock/internal/cluster"
+	server "github.com/kgantsov/dlock/internal/server"
+	"github.com/kgantsov/dlock/internal/store"
 )
 
 // Command line defaults

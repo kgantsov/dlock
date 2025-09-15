@@ -18,7 +18,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/hashicorp/raft"
-	badgerdb "github.com/kgantsov/dlock/badger-store"
+	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
 )
 
 const (
