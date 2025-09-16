@@ -1,11 +1,4 @@
-// Package store provides a simple distributed key-value store. The keys and
-// associated values are changed via distributed consensus, meaning that the
-// values are changed only when a majority of nodes in the cluster agree on
-// the new value.
-//
-// Distributed consensus is provided via the Raft algorithm, specifically the
-// Hashicorp implementation.
-package store
+package raft
 
 import (
 	"encoding/json"
@@ -15,10 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/rs/zerolog/log"
 
 	"github.com/hashicorp/raft"
-	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
+	"github.com/kgantsov/dlock/internal/storage"
+	badgerdb "github.com/kgantsov/raft-badgerstore"
 )
 
 const (
@@ -32,14 +27,16 @@ type command struct {
 	Time string `json:"time,omitempty"`
 }
 
-// Store is a simple key-value store, where all changes are made via Raft consensus.
-type Store struct {
+// Node is a simple key-value store, where all changes are made via Raft consensus.
+type Node struct {
 	RaftDir  string
 	RaftBind string
 	ServerID raft.ServerID
 
-	mu    sync.Mutex
-	store badgerdb.Store
+	mu      sync.Mutex
+	storage storage.Storage
+
+	db *badger.DB
 
 	leaderChangeFn func(bool)
 
@@ -48,22 +45,23 @@ type Store struct {
 	raft *raft.Raft // The consensus mechanism
 }
 
-// New returns a new Store.
-func New() *Store {
-	return &Store{
+// NewNode returns a new Store.
+func NewNode(db *badger.DB) *Node {
+	return &Node{
 		leaderChangeFn:     func(bool) {},
 		valueLogGCInterval: 5 * time.Minute,
+		db:                 db,
 	}
 }
 
-func (s *Store) SetLeaderChangeFunc(leaderChangeFn func(bool)) {
+func (s *Node) SetLeaderChangeFunc(leaderChangeFn func(bool)) {
 	s.leaderChangeFn = leaderChangeFn
 }
 
 // Open opens the store. If enableSingle is set, and there are no existing peers,
 // then this node becomes the first node, and therefore leader, of the cluster.
 // localID should be the server identifier for this node.
-func (s *Store) Open(enableSingle bool, localID string) error {
+func (s *Node) Open(enableSingle bool, localID string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
@@ -88,15 +86,13 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	// Create the log store and stable store.
 	var logStore raft.LogStore
 	var stableStore raft.StableStore
-	badgerDB, err := badgerdb.New(badgerdb.Options{
-		Path: s.RaftDir,
-	})
+	badgerDB, err := badgerdb.New(s.db, badgerdb.Options{})
 	if err != nil {
 		return fmt.Errorf("new store: %s", err)
 	}
 	logStore = badgerDB
 	stableStore = badgerDB
-	s.store = badgerDB
+	s.storage = storage.NewBadgerStorage(s.db)
 
 	// Instantiate the Raft systems.
 	ra, err := raft.NewRaft(config, (*FSM)(s), logStore, stableStore, snapshots, transport)
@@ -122,7 +118,7 @@ func (s *Store) Open(enableSingle bool, localID string) error {
 	return nil
 }
 
-func (s *Store) ListenToLeaderChanges() {
+func (s *Node) ListenToLeaderChanges() {
 	for isLeader := range s.raft.LeaderCh() {
 		if isLeader {
 			log.Info().Msgf("Node %s has become a leader", s.ServerID)
@@ -134,7 +130,7 @@ func (s *Store) ListenToLeaderChanges() {
 }
 
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
-func (s *Store) Acquire(key string, ttl int) error {
+func (s *Node) Acquire(key string, ttl int) error {
 	if s.raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
@@ -163,7 +159,7 @@ func (s *Store) Acquire(key string, ttl int) error {
 }
 
 // Release releases a lock for the given key.
-func (s *Store) Release(key string) error {
+func (s *Node) Release(key string) error {
 	if s.raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
@@ -192,7 +188,7 @@ func (s *Store) Release(key string) error {
 
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
-func (s *Store) Join(nodeID, addr string) error {
+func (s *Node) Join(nodeID, addr string) error {
 	log.Info().Msgf("received join request for remote node %s at %s", nodeID, addr)
 
 	configFuture := s.raft.GetConfiguration()
@@ -227,17 +223,16 @@ func (s *Store) Join(nodeID, addr string) error {
 	return nil
 }
 
-func (s *Store) RunValueLogGC() {
+func (s *Node) RunValueLogGC() {
 	ticker := time.NewTicker(s.valueLogGCInterval)
 	defer ticker.Stop()
 
 	log.Debug().Msgf("Started running value GC")
 
 	for range ticker.C {
-		locks := s.store.Locks()
-		log.Debug().Msgf("Running value GC. Locks found: %d", len(locks))
+		log.Debug().Msg("Running value GC")
 	again:
-		err := s.store.RunValueLogGC(0.7)
+		err := s.db.RunValueLogGC(0.7)
 		if err == nil {
 			goto again
 		}

@@ -7,12 +7,13 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	cluster "github.com/kgantsov/dlock/internal/cluster"
+	"github.com/kgantsov/dlock/internal/raft"
 	server "github.com/kgantsov/dlock/internal/server"
-	"github.com/kgantsov/dlock/internal/store"
 )
 
 // Command line defaults
@@ -54,17 +55,24 @@ func main() {
 	}
 
 	// Ensure Raft storage exists.
-	raftDir := flag.Arg(0)
-	if raftDir == "" {
+	dataDir := flag.Arg(0)
+	if dataDir == "" {
 		log.Info().Msg("No Raft storage directory specified")
 	}
-	if err := os.MkdirAll(raftDir, 0700); err != nil {
+	if err := os.MkdirAll(dataDir, 0700); err != nil {
 		log.Fatal().Msgf("failed to create path for Raft storage: %s", err.Error())
 	}
 
-	s := store.New()
-	s.RaftDir = raftDir
-	go s.RunValueLogGC()
+	opts := badger.DefaultOptions(dataDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
+
+	node := raft.NewNode(db)
+	node.RaftDir = dataDir
+	go node.RunValueLogGC()
 
 	var j *cluster.Joiner
 
@@ -84,20 +92,20 @@ func main() {
 		raftAddr = cl.RaftAddr()
 		hosts = cl.Hosts()
 
-		s.SetLeaderChangeFunc(cl.LeaderChanged)
+		node.SetLeaderChangeFunc(cl.LeaderChanged)
 	} else {
 		if joinAddr != "" {
 			hosts = append(hosts, joinAddr)
 		}
 	}
 
-	s.RaftBind = raftAddr
+	node.RaftBind = raftAddr
 
-	if err := s.Open(true, nodeID); err != nil {
+	if err := node.Open(true, nodeID); err != nil {
 		log.Fatal().Msgf("failed to open store: %s", err.Error())
 	}
 
-	h := server.New(httpAddr, s)
+	h := server.New(httpAddr, node)
 	go func() {
 		if err := h.Start(); err != nil {
 			log.Error().Msgf("failed to start HTTP service: %s", err.Error())

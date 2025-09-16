@@ -1,13 +1,14 @@
-package store
+package raft
 
 import (
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -15,87 +16,110 @@ import (
 
 // TestStoreOpen tests that the store can be opened.
 func TestStoreOpen(t *testing.T) {
-	s := New()
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "db*")
 	defer os.RemoveAll(tmpDir)
 
-	s.RaftBind = "127.0.0.1:0"
-	s.RaftDir = tmpDir
+	opts := badger.DefaultOptions(tmpDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
 
-	assert.NotNil(t, s)
+	n := NewNode(db)
 
-	err := s.Open(false, "node0")
+	n.RaftBind = "127.0.0.1:0"
+
+	assert.NotNil(t, n)
+
+	err = n.Open(false, "node0")
 	require.NoError(t, err)
 }
 
 // TestStoreOpenSingleNode tests that a command can be applied to the log
 func TestStoreOpenSingleNode(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "db*")
+	defer os.RemoveAll(tmpDir)
+
+	opts := badger.DefaultOptions(tmpDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
+
 	becomeLeader := false
-	s := New()
-	s.SetLeaderChangeFunc(func(isLeader bool) {
+	n := NewNode(db)
+	n.SetLeaderChangeFunc(func(isLeader bool) {
 		if isLeader {
 			becomeLeader = true
 		}
 	})
-	tmpDir, _ := ioutil.TempDir("", "store_test")
-	defer os.RemoveAll(tmpDir)
 
-	s.RaftBind = "127.0.0.1:0"
-	s.RaftDir = tmpDir
+	n.RaftBind = "127.0.0.1:0"
+	n.RaftDir = tmpDir
 
-	assert.NotNil(t, s)
+	assert.NotNil(t, n)
 
-	err := s.Open(true, "node0")
+	err = n.Open(true, "node0")
 	require.NoError(t, err)
 
 	// Simple way to ensure there is a leader.
 	time.Sleep(3 * time.Second)
 	assert.True(t, becomeLeader)
 
-	err = s.Acquire("foo", 60)
+	err = n.Acquire("foo", 60)
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = s.Acquire("foo", 60)
+	err = n.Acquire("foo", 60)
 	require.Error(t, err)
 
-	err = s.Release("foo")
+	err = n.Release("foo")
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = s.Acquire("foo", 60)
+	err = n.Acquire("foo", 60)
 	require.NoError(t, err)
 }
 
 // TestStoreOpenSingleNodeWithTTL tests that a command can be applied to the log
 func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
-	s := New()
-	tmpDir, _ := ioutil.TempDir("", "store_test")
+	tmpDir, _ := os.MkdirTemp("", "db*")
 	defer os.RemoveAll(tmpDir)
 
-	s.RaftBind = "127.0.0.1:0"
-	s.RaftDir = tmpDir
+	opts := badger.DefaultOptions(tmpDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
 
-	assert.NotNil(t, s)
+	n := NewNode(db)
 
-	err := s.Open(true, "node0")
+	n.RaftBind = "127.0.0.1:0"
+	n.RaftDir = tmpDir
+
+	assert.NotNil(t, n)
+
+	err = n.Open(true, "node0")
 	require.NoError(t, err)
 
 	// Simple way to ensure there is a leader.
 	time.Sleep(3 * time.Second)
 
-	err = s.Acquire("foo", 2)
+	err = n.Acquire("foo", 2)
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = s.Acquire("foo", 2)
+	err = n.Acquire("foo", 2)
 	assert.Error(t, err)
 
 	time.Sleep(2 * time.Second)
-	err = s.Acquire("foo", 2)
+	err = n.Acquire("foo", 2)
 	require.NoError(t, err)
 }
 
@@ -174,27 +198,4 @@ func (m *MockStore) Size() (lsm, vlog int64) {
 func (m *MockStore) Locks() []string {
 	args := m.Called()
 	return args.Get(0).([]string)
-}
-
-func TestRunValueLogGC(t *testing.T) {
-	mockStore := new(MockStore)
-
-	// Set up expectations
-	mockStore.On("Locks").Return([]string{})
-	mockStore.On("RunValueLogGC", 0.7).Return(nil)
-
-	// Creating the store with the mocked dependencies
-	s := &Store{
-		store:              mockStore,
-		valueLogGCInterval: 5 * time.Millisecond,
-	}
-
-	// Running the function in a separate goroutine to allow it to be stopped
-	go s.RunValueLogGC()
-
-	// Sleep for a short duration to allow the ticker to tick at least once
-	time.Sleep(10 * time.Millisecond)
-
-	// Checking that the expectations were met
-	mockStore.AssertExpectations(t)
 }

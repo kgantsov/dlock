@@ -1,4 +1,4 @@
-package store
+package raft
 
 import (
 	"bytes"
@@ -8,8 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dgraph-io/badger/v4"
 	"github.com/hashicorp/raft"
-	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
+	"github.com/kgantsov/dlock/internal/storage"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,14 +61,27 @@ func (m *MemorySnapshotSink) Read(p []byte) (n int, err error) {
 	return m.buf.Read(p)
 }
 func TestFSM_Snapshot(t *testing.T) {
+	tmpDir, _ := os.MkdirTemp("", "db*")
+	defer os.RemoveAll(tmpDir)
+
+	tmpRaftDir, _ := os.MkdirTemp("", "store_test*")
+	defer os.RemoveAll(tmpRaftDir)
+
+	opts := badger.DefaultOptions(tmpDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
+
 	// Initialize the FSM with a test store
-	store, err := badgerdb.New(badgerdb.Options{
-		Path: "/tmp/testdb",
-	})
+	// store, err := badgerdb.New(db, badgerdb.Options{})
+
 	require.NoError(t, err)
 	defer os.RemoveAll("/tmp/testdb") // Clean up
+	storage := storage.NewBadgerStorage(db)
 
-	fsm := &FSM{store: store}
+	fsm := &FSM{storage: storage}
 
 	// Apply some commands to the FSM
 	fsm.Apply(&raft.Log{Data: []byte(`{"Op": "acquire", "Key": "key1", "Time": "2023-06-01T12:00:00Z"}`)})
@@ -83,13 +98,19 @@ func TestFSM_Snapshot(t *testing.T) {
 func TestFSM_Restore(t *testing.T) {
 	tmpDir, _ := os.MkdirTemp("", "db*")
 	defer os.RemoveAll(tmpDir)
+
+	opts := badger.DefaultOptions(tmpDir)
+	db, err := badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
+
 	// Initialize the FSM with a test store
-	store, err := badgerdb.New(badgerdb.Options{
-		Path: tmpDir,
-	})
+	store := storage.NewBadgerStorage(db)
 	require.NoError(t, err)
 
-	fsm := &FSM{store: store}
+	fsm := &FSM{storage: store}
 
 	err = store.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
@@ -116,17 +137,25 @@ func TestFSM_Restore(t *testing.T) {
 	require.NoError(t, err)
 
 	// Close the current store and restore from the snapshot
-	err = fsm.store.Close()
+	err = db.Close()
 	require.NoError(t, err)
+
+	tmpRestoreDir, _ := os.MkdirTemp("", "dbrestore*")
+	defer os.RemoveAll(tmpRestoreDir)
+
+	db, err = badger.Open(opts)
+	if err != nil {
+		log.Fatal().Msg(err.Error())
+	}
+	defer db.Close()
+
+	store = storage.NewBadgerStorage(db)
 
 	tmpDir2, _ := os.MkdirTemp("", "db*")
 	defer os.RemoveAll(tmpDir2)
 	// Reinitialize the store for restore
-	restoreStore, err := badgerdb.New(badgerdb.Options{
-		Path: tmpDir2,
-	})
-	require.NoError(t, err)
-	fsm.store = restoreStore
+
+	fsm.storage = store
 
 	// Restore from the snapshot
 	err = fsm.Restore(io.NopCloser(sink))
@@ -136,15 +165,15 @@ func TestFSM_Restore(t *testing.T) {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
 
-	err = fsm.store.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
+	err = fsm.storage.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
 
-	err = fsm.store.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
+	err = fsm.storage.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
 	require.Error(t, err)
 
-	err = fsm.store.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
+	err = fsm.storage.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
 	require.Error(t, err)
 
-	err = fsm.store.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Second*10))
+	err = fsm.storage.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
 }

@@ -1,4 +1,4 @@
-package store
+package raft
 
 import (
 	"bufio"
@@ -7,13 +7,12 @@ import (
 	"io"
 	"time"
 
-	badgerdb "github.com/kgantsov/dlock/internal/badger-store"
-
 	"github.com/hashicorp/raft"
+	"github.com/kgantsov/dlock/internal/storage"
 	"github.com/rs/zerolog/log"
 )
 
-type FSM Store
+type FSM Node
 
 type FSMResponse struct {
 	key   string
@@ -44,7 +43,7 @@ func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	snapshot := &FSMSnapshot{path: f.store.DBPath(), store: f.store}
+	snapshot := &FSMSnapshot{storage: f.storage}
 	return snapshot, nil
 }
 
@@ -63,13 +62,13 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 		line := scanner.Bytes()
 		linesTotal++
 
-		var lockEntry badgerdb.LockEntry
+		var lockEntry storage.LockEntry
 		if err := json.Unmarshal(line, &lockEntry); err != nil {
 			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, string(line))
 			continue
 		}
 
-		err := f.store.Acquire([]byte(lockEntry.Key), lockEntry.ExpireAt)
+		err := f.storage.Acquire([]byte(lockEntry.Key), lockEntry.ExpireAt)
 		if err != nil {
 			continue
 		}
@@ -104,7 +103,7 @@ func (f *FSM) applyAcquire(key, expireAt string) interface{} {
 		}
 	}
 
-	err = f.store.Acquire([]byte(key), expire)
+	err = f.storage.Acquire([]byte(key), expire)
 
 	if err != nil {
 		return &FSMResponse{
@@ -120,7 +119,7 @@ func (f *FSM) applyRelease(key string) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	err := f.store.Release([]byte(key))
+	err := f.storage.Release([]byte(key))
 
 	if err != nil {
 		return &FSMResponse{
