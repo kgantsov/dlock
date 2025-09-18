@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/kgantsov/dlock/internal/domain"
 )
 
 type (
@@ -41,7 +43,7 @@ func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOut
 		Body: AcquireOutputBody{
 			Status:       "ACQUIRED",
 			Owner:        lock.Owner,
-			FencingToken: lock.FencingToken,
+			FencingToken: strconv.FormatUint(lock.FencingToken, 10),
 			ExpireAt:     time.Unix(lock.ExpireAt, 0),
 		},
 	}
@@ -51,7 +53,13 @@ func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOut
 func (h *Handler) Release(ctx context.Context, input *ReleaseInput) (*ReleaseOutput, error) {
 	key := input.Key
 	owner := input.Body.Owner
-	fencingToken := input.Body.FencingToken
+
+	fencingToken, err := strconv.ParseUint(input.Body.FencingToken, 10, 64)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(
+			"Failed to parse fencing token", domain.ErrInvalidFencingToken,
+		)
+	}
 
 	if err := h.node.Release(key, owner, fencingToken); err != nil {
 		return nil, huma.Error400BadRequest("Failed to release a lock", err)

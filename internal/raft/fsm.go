@@ -104,7 +104,7 @@ func (f *FSM) applyAcquire(payload *pb.RaftCommand_Acquire) interface{} {
 	if err != nil {
 		return &pb.AcquireResp{
 			Key:   payload.Acquire.Key,
-			Error: fmt.Errorf("Failed to acquire a lock for a key: %s", payload.Acquire.Key).Error(),
+			Error: err.Error(),
 		}
 	}
 
@@ -129,7 +129,7 @@ func (f *FSM) applyRelease(payload *pb.RaftCommand_Release) interface{} {
 	if err != nil {
 		return &pb.ReleaseResp{
 			Success: false,
-			Error:   fmt.Errorf("Failed to release a lock for a key: %s", payload.Release.Key).Error(),
+			Error:   err.Error(),
 		}
 	}
 	return &pb.ReleaseResp{Success: true}

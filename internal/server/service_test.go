@@ -86,7 +86,7 @@ func TestLock(t *testing.T) {
 
 	type SuccessOutput struct {
 		Status       string `json:"status"`
-		FencingToken uint64 `json:"fencing_token,omitempty"`
+		FencingToken string `json:"fencing_token,omitempty"`
 	}
 	type ErrorOutput struct {
 		Title  string `json:"title"`
@@ -179,7 +179,7 @@ func TestRelease(t *testing.T) {
 
 	resp := api.Post("/API/v1/locks/non_existing_lock/release", map[string]any{
 		"owner":         "owner-1",
-		"fencing_token": 123,
+		"fencing_token": "123",
 	})
 
 	errorOutput := &ErrorOutput{}

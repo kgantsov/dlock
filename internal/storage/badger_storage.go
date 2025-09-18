@@ -101,10 +101,12 @@ func (s *BadgerStorage) Release(key, owner string, fencingToken uint64) error {
 	}
 
 	if lock.Owner != owner {
+		log.Info().Msgf("Owner mismatch: %s != %s", lock.Owner, owner)
 		return domain.ErrOwnerMismatch
 	}
 
 	if lock.FencingToken != fencingToken {
+		log.Info().Msgf("Fencing token mismatch: %d != %d", lock.FencingToken, fencingToken)
 		return domain.ErrFencingTokenMismatch
 	}
 
