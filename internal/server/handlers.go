@@ -3,21 +3,19 @@ package server
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sirupsen/logrus"
 )
 
 type (
 	Handler struct {
-		Logger *logrus.Logger
-		store  Store
+		node Node
 	}
 )
 
 func (h *Handler) Join(ctx context.Context, input *JoinInput) (*JoinOutput, error) {
-
-	if err := h.store.Join(input.Body.ID, input.Body.Addr); err != nil {
+	if err := h.node.Join(input.Body.ID, input.Body.Addr); err != nil {
 		return &JoinOutput{}, err
 	}
 
@@ -31,24 +29,37 @@ func (h *Handler) Join(ctx context.Context, input *JoinInput) (*JoinOutput, erro
 func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOutput, error) {
 	key := input.Key
 	ttl := input.Body.TTL
+	owner := input.Body.Owner
 
-	if err := h.store.Acquire(key, ttl); err != nil {
+	lock, err := h.node.Acquire(key, owner, ttl)
+	if err != nil {
 		return nil, huma.Error409Conflict("Failed to acquire a lock", err)
 	}
 
-	res := &AcquireOutput{Status: http.StatusOK}
-	res.Body.Status = "ACQUIRED"
+	res := &AcquireOutput{
+		Status: http.StatusOK,
+		Body: AcquireOutputBody{
+			Status:       "ACQUIRED",
+			Owner:        lock.Owner,
+			FencingToken: lock.FencingToken,
+			ExpireAt:     time.Unix(lock.ExpireAt, 0),
+		},
+	}
 	return res, nil
 }
 
 func (h *Handler) Release(ctx context.Context, input *ReleaseInput) (*ReleaseOutput, error) {
 	key := input.Key
+	owner := input.Body.Owner
+	fencingToken := input.Body.FencingToken
 
-	if err := h.store.Release(key); err != nil {
+	if err := h.node.Release(key, owner, fencingToken); err != nil {
 		return nil, huma.Error400BadRequest("Failed to release a lock", err)
 	}
 
-	res := &ReleaseOutput{Status: http.StatusOK}
-	res.Body.Status = "RELEASED"
+	res := &ReleaseOutput{
+		Status: http.StatusOK,
+		Body:   ReleaseOutputBody{Status: "RELEASED"},
+	}
 	return res, nil
 }

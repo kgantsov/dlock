@@ -11,7 +11,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/gofiber/fiber/v2"
-	"github.com/sirupsen/logrus"
+	"github.com/kgantsov/dlock/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,9 +50,9 @@ func TestNew(t *testing.T) {
 	}
 
 	// check that the correct headers are set by middlewares
-	jsonBody := []byte(`{"ttl": 60}`)
+	jsonBody := []byte(`{"owner": "owner-1", "ttl": 60}`)
 	bodyReader := bytes.NewReader(jsonBody)
-	req := httptest.NewRequest("POST", "/API/v1/locks/my-lock-1", bodyReader)
+	req := httptest.NewRequest("POST", "/API/v1/locks/my-lock-1/acquire", bodyReader)
 	resp, err := service.router.Test(req)
 
 	require.NoError(t, err)
@@ -77,19 +77,16 @@ func TestNew(t *testing.T) {
 func TestLock(t *testing.T) {
 	_, api := humatest.New(t)
 
-	log := logrus.New()
-	log.SetLevel(logrus.InfoLevel)
-
 	store := newTestStore()
 
 	h := &Handler{
-		store:  store,
-		Logger: log,
+		node: store,
 	}
 	h.RegisterRoutes(api)
 
 	type SuccessOutput struct {
-		Status string `json:"status"`
+		Status       string `json:"status"`
+		FencingToken uint64 `json:"fencing_token,omitempty"`
 	}
 	type ErrorOutput struct {
 		Title  string `json:"title"`
@@ -97,30 +94,33 @@ func TestLock(t *testing.T) {
 		Detail string `json:"detail"`
 	}
 
-	resp := api.Post("/API/v1/locks/migration_lock", map[string]any{
-		"ttl": 5,
+	resp := api.Post("/API/v1/locks/migration_lock/acquire", map[string]any{
+		"owner": "owner-1",
+		"ttl":   5,
 	})
 
-	successOutput := &SuccessOutput{}
+	lock1 := &SuccessOutput{}
 
-	json.Unmarshal(resp.Body.Bytes(), successOutput)
+	json.Unmarshal(resp.Body.Bytes(), lock1)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "ACQUIRED", successOutput.Status)
+	assert.Equal(t, "ACQUIRED", lock1.Status)
 
-	resp = api.Post("/API/v1/locks/another_lock", map[string]any{
-		"ttl": 5,
+	resp = api.Post("/API/v1/locks/another_lock/acquire", map[string]any{
+		"owner": "owner-2",
+		"ttl":   5,
 	})
 
-	successOutput = &SuccessOutput{}
+	lock2 := &SuccessOutput{}
 
-	json.Unmarshal(resp.Body.Bytes(), successOutput)
+	json.Unmarshal(resp.Body.Bytes(), lock2)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "ACQUIRED", successOutput.Status)
+	assert.Equal(t, "ACQUIRED", lock2.Status)
 
-	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
-		"ttl": 5,
+	resp = api.Post("/API/v1/locks/migration_lock/acquire", map[string]any{
+		"owner": "owner-1",
+		"ttl":   5,
 	})
 
 	errorOutput := &ErrorOutput{}
@@ -132,39 +132,39 @@ func TestLock(t *testing.T) {
 	assert.Equal(t, 409, errorOutput.Status)
 	assert.Equal(t, "Failed to acquire a lock", errorOutput.Detail)
 
-	resp = api.Delete("/API/v1/locks/migration_lock")
-
-	successOutput = &SuccessOutput{}
-
-	json.Unmarshal(resp.Body.Bytes(), successOutput)
-
-	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "RELEASED", successOutput.Status)
-
-	resp = api.Post("/API/v1/locks/migration_lock", map[string]any{
-		"ttl": 0,
+	resp = api.Post("/API/v1/locks/migration_lock/release", map[string]any{
+		"owner":         "owner-1",
+		"fencing_token": lock1.FencingToken,
 	})
 
-	successOutput = &SuccessOutput{}
+	lock1 = &SuccessOutput{}
 
-	json.Unmarshal(resp.Body.Bytes(), successOutput)
+	json.Unmarshal(resp.Body.Bytes(), lock1)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "ACQUIRED", successOutput.Status)
+	assert.Equal(t, "RELEASED", lock1.Status)
+
+	resp = api.Post("/API/v1/locks/migration_lock/acquire", map[string]any{
+		"owner": "owner-1",
+		"ttl":   1,
+	})
+
+	lock1 = &SuccessOutput{}
+
+	json.Unmarshal(resp.Body.Bytes(), lock1)
+
+	assert.Equal(t, http.StatusOK, resp.Code)
+	assert.Equal(t, "ACQUIRED", lock1.Status)
 }
 
-// TestRelease tests the release endpoint with the lock that is not qcuired.
+// TestRelease tests the release endpoint with the lock that is not acquired.
 func TestRelease(t *testing.T) {
 	_, api := humatest.New(t)
-
-	log := logrus.New()
-	log.SetLevel(logrus.InfoLevel)
 
 	store := newTestStore()
 
 	h := &Handler{
-		store:  store,
-		Logger: log,
+		node: store,
 	}
 	h.RegisterRoutes(api)
 
@@ -177,7 +177,10 @@ func TestRelease(t *testing.T) {
 		Detail string `json:"detail"`
 	}
 
-	resp := api.Delete("/API/v1/locks/non_existing_lock")
+	resp := api.Post("/API/v1/locks/non_existing_lock/release", map[string]any{
+		"owner":         "owner-1",
+		"fencing_token": 123,
+	})
 
 	errorOutput := &ErrorOutput{}
 
@@ -193,14 +196,10 @@ func TestRelease(t *testing.T) {
 func TestJoin(t *testing.T) {
 	_, api := humatest.New(t)
 
-	log := logrus.New()
-	log.SetLevel(logrus.InfoLevel)
-
 	store := newTestStore()
 
 	h := &Handler{
-		store:  store,
-		Logger: log,
+		node: store,
 	}
 	h.RegisterRoutes(api)
 
@@ -229,31 +228,45 @@ func TestJoin(t *testing.T) {
 }
 
 type testStore struct {
-	m map[string]time.Time
+	m map[string]*domain.LockEntry
 }
 
 func newTestStore() *testStore {
 	return &testStore{
-		m: make(map[string]time.Time),
+		m: make(map[string]*domain.LockEntry),
 	}
 }
 
-func (t *testStore) Acquire(key string, ttl int) error {
+func (t *testStore) Acquire(key, owner string, ttl int64) (*domain.LockEntry, error) {
 	_, ok := t.m[key]
 
 	if ok {
-		return fmt.Errorf("Failed to acquire a lock for a key: %s", key)
+		return nil, fmt.Errorf("Failed to acquire a lock for a key: %s", key)
 	}
 
-	t.m[key] = time.Now().UTC().Add(time.Second * time.Duration(ttl))
-	return nil
+	lock := &domain.LockEntry{
+		Key:          key,
+		Owner:        owner,
+		FencingToken: uint64(time.Now().UnixNano()),
+		ExpireAt:     time.Now().UTC().Add(time.Second * time.Duration(ttl)).Unix(),
+	}
+
+	t.m[key] = lock
+	return lock, nil
 }
 
-func (t *testStore) Release(key string) error {
-	_, ok := t.m[key]
-
+func (t *testStore) Release(key, owner string, fencingToken uint64) error {
+	lock, ok := t.m[key]
 	if !ok {
 		return fmt.Errorf("Failed to release a lock for a key: %s", key)
+	}
+
+	if lock.Owner != owner {
+		return domain.ErrOwnerMismatch
+	}
+
+	if lock.FencingToken != fencingToken {
+		return domain.ErrFencingTokenMismatch
 	}
 
 	delete(t.m, key)

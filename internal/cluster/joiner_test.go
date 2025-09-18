@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/kgantsov/dlock/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -102,5 +103,5 @@ func TestJoinerHostsUnavailable(t *testing.T) {
 
 	err := j.Join()
 
-	assert.Contains(t, err.Error(), "failed to join node at")
+	assert.Equal(t, domain.ErrFailedToJoinNode, err)
 }

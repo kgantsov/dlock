@@ -2,14 +2,15 @@ package raft
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/kgantsov/dlock/internal/storage"
+	"github.com/kgantsov/dlock/internal/domain"
+	pb "github.com/kgantsov/dlock/internal/proto"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/proto"
 )
 
 type FSM Node
@@ -20,21 +21,21 @@ type FSMResponse struct {
 }
 
 // Apply applies a Raft log entry to the key-value store.
-func (f *FSM) Apply(l *raft.Log) interface{} {
-	log.Debug().Msgf("Apply log: %v", l)
+func (f *FSM) Apply(raftLog *raft.Log) interface{} {
+	log.Debug().Msgf("Apply log: %v", raftLog)
 
-	var c command
-	if err := json.Unmarshal(l.Data, &c); err != nil {
-		panic(fmt.Sprintf("failed to unmarshal command: %s", err.Error()))
+	var c pb.RaftCommand
+	if err := proto.Unmarshal(raftLog.Data, &c); err != nil {
+		return &FSMResponse{error: err}
 	}
 
-	switch c.Op {
-	case "acquire":
-		return f.applyAcquire(c.Key, c.Time)
-	case "release":
-		return f.applyRelease(c.Key)
+	switch command := c.Cmd.(type) {
+	case *pb.RaftCommand_Acquire:
+		return f.applyAcquire(command)
+	case *pb.RaftCommand_Release:
+		return f.applyRelease(command)
 	default:
-		panic(fmt.Sprintf("unrecognized command op: %s", c.Op))
+		return fmt.Errorf("unknown command: %s", c.Cmd)
 	}
 }
 
@@ -62,13 +63,13 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 		line := scanner.Bytes()
 		linesTotal++
 
-		var lockEntry storage.LockEntry
-		if err := json.Unmarshal(line, &lockEntry); err != nil {
+		lock, err := domain.LockEntryFromBytes(line)
+		if err != nil {
 			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, string(line))
 			continue
 		}
 
-		err := f.storage.Acquire([]byte(lockEntry.Key), lockEntry.ExpireAt)
+		_, err = f.storage.Acquire(lock.Key, lock.Owner, lock.FencingToken, time.Unix(lock.ExpireAt, 0))
 		if err != nil {
 			continue
 		}
@@ -89,43 +90,47 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	return nil
 }
 
-func (f *FSM) applyAcquire(key, expireAt string) interface{} {
+func (f *FSM) applyAcquire(payload *pb.RaftCommand_Acquire) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	expire, err := time.Parse(time.RFC3339, expireAt)
+	lock, err := f.storage.Acquire(
+		payload.Acquire.Key,
+		payload.Acquire.Owner,
+		payload.Acquire.FencingToken,
+		time.Unix(payload.Acquire.ExpireAt, 0),
+	)
+
 	if err != nil {
-		return &FSMResponse{
-			key: key,
-			error: fmt.Errorf(
-				"Failed to parse expirition time for a lock for a key: %s %s", key, expireAt,
-			),
+		return &pb.AcquireResp{
+			Key:   payload.Acquire.Key,
+			Error: fmt.Errorf("Failed to acquire a lock for a key: %s", payload.Acquire.Key).Error(),
 		}
 	}
 
-	err = f.storage.Acquire([]byte(key), expire)
-
-	if err != nil {
-		return &FSMResponse{
-			key:   key,
-			error: fmt.Errorf("Failed to acquire a lock for a key: %s", key),
-		}
+	return &pb.AcquireResp{
+		Key:          payload.Acquire.Key,
+		Owner:        lock.Owner,
+		FencingToken: lock.FencingToken,
+		ExpireAt:     lock.ExpireAt,
 	}
-
-	return &FSMResponse{key: key, error: nil}
 }
 
-func (f *FSM) applyRelease(key string) interface{} {
+func (f *FSM) applyRelease(payload *pb.RaftCommand_Release) interface{} {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	err := f.storage.Release([]byte(key))
+	err := f.storage.Release(
+		payload.Release.Key,
+		payload.Release.Owner,
+		payload.Release.FencingToken,
+	)
 
 	if err != nil {
-		return &FSMResponse{
-			key:   key,
-			error: fmt.Errorf("Failed to release a lock for a key: %s", key),
+		return &pb.ReleaseResp{
+			Success: false,
+			Error:   fmt.Errorf("Failed to release a lock for a key: %s", payload.Release.Key).Error(),
 		}
 	}
-	return &FSMResponse{key: key, error: nil}
+	return &pb.ReleaseResp{Success: true}
 }

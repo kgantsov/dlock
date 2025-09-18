@@ -33,7 +33,7 @@ func main() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339})
 
 	// Default level for this example is info, unless debug flag is present
-	zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
@@ -118,6 +118,8 @@ func main() {
 	if err := j.Join(); err != nil {
 		log.Fatal().Msg(err.Error())
 	}
+
+	node.InitIDGenerator()
 
 	log.Info().Msgf("dlock started successfully, listening on http://%s", httpAddr)
 

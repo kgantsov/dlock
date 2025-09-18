@@ -2,13 +2,6 @@ package storage
 
 import (
 	"encoding/binary"
-	"errors"
-)
-
-var (
-	ErrKeyNotFound         = errors.New("not found")
-	ErrCouldNotAcquireLock = errors.New("could not acquire a lock")
-	ErrCouldNotReleaseLock = errors.New("could not release a lock")
 )
 
 func addPrefix(prefix []byte, key []byte) []byte {

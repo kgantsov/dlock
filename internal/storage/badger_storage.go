@@ -1,11 +1,11 @@
 package storage
 
 import (
-	"encoding/json"
 	"io"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/kgantsov/dlock/internal/domain"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,53 +26,91 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 	}
 }
 
-func (s *BadgerStorage) Acquire(key []byte, expireAt time.Time) error {
+func (s *BadgerStorage) Acquire(key, owner string, fencingToken uint64, expireAt time.Time) (*domain.LockEntry, error) {
 	log.Debug().Msgf("Acquiring lock for key: %s", key)
 
 	txn := s.db.NewTransaction(true)
 	defer txn.Discard()
 
-	item, err := txn.Get(addPrefix(dbLock, key))
+	item, err := txn.Get(addPrefix(dbLock, []byte(key)))
 	if err != nil {
 		if err != badger.ErrKeyNotFound {
-			return err
+			return nil, err
 		}
 	} else {
 		val, err := item.ValueCopy(nil)
+		if err != nil {
+			return nil, err
+		}
+		lock, err := domain.LockEntryFromBytes(val)
 
 		if err == nil {
-			var valueExpireAt time.Time
-			err = valueExpireAt.UnmarshalBinary(val)
-
 			if err == nil {
-				if time.Now().Before(valueExpireAt) {
-					return ErrCouldNotAcquireLock
+				if time.Now().Before(time.Unix(lock.ExpireAt, 0)) {
+					return nil, domain.ErrLockAlreadyAcquired
 				}
 			}
 		}
 	}
 
-	expireInBytes, _ := expireAt.MarshalBinary()
-	e := badger.NewEntry(addPrefix(dbLock, key), expireInBytes).WithTTL(expireAt.Sub(time.Now().UTC()))
-	if err := txn.SetEntry(e); err != nil {
-		return err
+	lock := &domain.LockEntry{
+		Key:          string(key),
+		Owner:        owner,
+		FencingToken: fencingToken,
+		ExpireAt:     expireAt.Unix(),
 	}
 
-	return txn.Commit()
+	lockBytes, err := lock.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	e := badger.NewEntry(
+		addPrefix(dbLock, []byte(key)),
+		lockBytes,
+	).WithTTL(expireAt.Sub(time.Now().UTC()))
+
+	if err := txn.SetEntry(e); err != nil {
+		return nil, err
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		return nil, err
+	}
+	return lock, nil
 }
 
-func (s *BadgerStorage) Release(key []byte) error {
+func (s *BadgerStorage) Release(key, owner string, fencingToken uint64) error {
 	txn := s.db.NewTransaction(true)
 	defer txn.Discard()
 
-	_, err := txn.Get(addPrefix(dbLock, key))
+	item, err := txn.Get(addPrefix(dbLock, []byte(key)))
 	if err != nil {
-		return ErrCouldNotReleaseLock
+		return domain.ErrLockNotFound
 	}
 
-	err = txn.Delete(addPrefix(dbLock, key))
+	val, err := item.ValueCopy(nil)
 	if err != nil {
-		return ErrCouldNotReleaseLock
+		return err
+	}
+	lock, err := domain.LockEntryFromBytes(val)
+
+	if err != nil {
+		return err
+	}
+
+	if lock.Owner != owner {
+		return domain.ErrOwnerMismatch
+	}
+
+	if lock.FencingToken != fencingToken {
+		return domain.ErrFencingTokenMismatch
+	}
+
+	err = txn.Delete(addPrefix(dbLock, []byte(key)))
+	if err != nil {
+		return err
 	}
 
 	return txn.Commit()
@@ -128,33 +166,28 @@ func (s *BadgerStorage) PersistSnapshot(w io.Writer) error {
 			continue
 		}
 
+		lock, err := domain.LockEntryFromBytes(val)
+		if err != nil {
+			log.Debug().Msgf("Error unmarshaling key %s %v", key[:len(dbLock)], err)
+			continue
+		}
+
 		var valueExpireAt time.Time
 		err = valueExpireAt.UnmarshalBinary(val)
 
 		if err == nil {
-			if time.Now().After(valueExpireAt) {
+			if time.Now().After(time.Unix(lock.ExpireAt, 0)) {
 				// Skip expired locks
 				continue
 			}
 		}
 
-		lockEntry := LockEntry{
-			Key:      string(key[len(dbLock):]),
-			ExpireAt: valueExpireAt,
-		}
-
-		data, err := json.Marshal(lockEntry)
-		if err != nil {
-			log.Debug().Msgf("Error encoding key %s %v %v", key[:len(dbLock)], lockEntry, err)
-			continue
-		}
-
-		if _, err := w.Write(data); err != nil {
-			log.Debug().Msgf("Error writing key %s %v %v", key[:len(dbLock)], lockEntry, err)
+		if _, err := w.Write(val); err != nil {
+			log.Debug().Msgf("Error writing key %s %v %v", key[:len(dbLock)], lock, err)
 			continue
 		}
 		if _, err := w.Write([]byte("\n")); err != nil {
-			log.Debug().Msgf("Error writing key %s %v", key[:len(dbLock)], lockEntry)
+			log.Debug().Msgf("Error writing key %s %v", key[:len(dbLock)], lock)
 			continue
 		}
 		cnt += 1

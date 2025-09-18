@@ -112,19 +112,19 @@ func TestFSM_Restore(t *testing.T) {
 
 	fsm := &FSM{storage: store}
 
-	err = store.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
+	_, err = store.Acquire("test-lock-1", "", 0, time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
+	_, err = store.Acquire("test-lock-2", "", 0, time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
+	_, err = store.Acquire("test-lock-3", "", 0, time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Millisecond))
+	_, err = store.Acquire("test-lock-4", "", 0, time.Now().UTC().Add(time.Millisecond))
 	require.NoError(t, err)
 
-	err = store.Release([]byte("test-lock-1"))
+	err = store.Release("test-lock-1", "", 0)
 	require.NoError(t, err)
 
 	// Create a snapshot
@@ -165,15 +165,23 @@ func TestFSM_Restore(t *testing.T) {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
 
-	err = fsm.storage.Acquire([]byte("test-lock-1"), time.Now().UTC().Add(time.Second*10))
+	_, err = fsm.storage.Acquire(
+		"test-lock-1", "owner-1", 1325236, time.Now().UTC().Add(time.Second*10),
+	)
 	require.NoError(t, err)
 
-	err = fsm.storage.Acquire([]byte("test-lock-2"), time.Now().UTC().Add(time.Second*10))
+	_, err = fsm.storage.Acquire(
+		"test-lock-2", "owner-2", 1325236, time.Now().UTC().Add(time.Second*10),
+	)
 	require.Error(t, err)
 
-	err = fsm.storage.Acquire([]byte("test-lock-3"), time.Now().UTC().Add(time.Second*10))
+	_, err = fsm.storage.Acquire(
+		"test-lock-3", "owner-3", 1325236, time.Now().UTC().Add(time.Second*10),
+	)
 	require.Error(t, err)
 
-	err = fsm.storage.Acquire([]byte("test-lock-4"), time.Now().UTC().Add(time.Second*10))
+	_, err = fsm.storage.Acquire(
+		"test-lock-4", "owner-4", 1325236, time.Now().UTC().Add(time.Second*10),
+	)
 	require.NoError(t, err)
 }

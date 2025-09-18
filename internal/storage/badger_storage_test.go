@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
+	"github.com/kgantsov/dlock/internal/domain"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,19 +28,33 @@ func TestBadgerStore_Acquire_Release(t *testing.T) {
 
 	defer store.Close()
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:1", "owner-1", 436, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
-	assert.Equal(t, ErrCouldNotAcquireLock, err)
+	_, err = store.Acquire("my-lock:1", "owner-1", 436, time.Now().UTC().Add(time.Second*1))
+	assert.Equal(t, domain.ErrLockAlreadyAcquired, err)
 
-	err = store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:2", "owner-2", 437, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
-	err = store.Release([]byte("my-lock:1"))
+	err = store.Release("my-lock:1", "owner-1", 435)
+	require.Error(t, err)
+	assert.Equal(t, domain.ErrFencingTokenMismatch, err)
+
+	err = store.Release("my-lock:1", "owner-2", 436)
+	require.Error(t, err)
+	assert.Equal(t, domain.ErrOwnerMismatch, err)
+
+	err = store.Release("my-lock:1", "owner-1", 436)
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:1", "owner-1", 438, time.Now().UTC().Add(time.Second*1))
+	require.NoError(t, err)
+
+	err = store.Release("my-lock:2", "owner-2", 437)
+	require.NoError(t, err)
+
+	err = store.Release("my-lock:1", "owner-1", 438)
 	require.NoError(t, err)
 }
 
@@ -58,15 +73,15 @@ func TestBadgerStore_Acquire_Release_WithTTL(t *testing.T) {
 	store := NewBadgerStorage(db)
 	defer store.Close()
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:1", "", 0, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
-	assert.Equal(t, ErrCouldNotAcquireLock, err)
+	_, err = store.Acquire("my-lock:1", "", 0, time.Now().UTC().Add(time.Second*1))
+	assert.Equal(t, domain.ErrLockAlreadyAcquired, err)
 
 	time.Sleep(1 * time.Second)
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:1", "", 0, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 }
 
@@ -85,13 +100,13 @@ func TestBadgerStore_Locks(t *testing.T) {
 	store := NewBadgerStorage(db)
 	defer store.Close()
 
-	err = store.Acquire([]byte("my-lock:1"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:1", "", 0, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("my-lock:2"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:2", "", 0, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
-	err = store.Acquire([]byte("my-lock:3"), time.Now().UTC().Add(time.Second*1))
+	_, err = store.Acquire("my-lock:3", "", 0, time.Now().UTC().Add(time.Second*1))
 	require.NoError(t, err)
 
 	locks := store.Locks()

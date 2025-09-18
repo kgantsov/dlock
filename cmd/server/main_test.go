@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,11 +29,6 @@ func TestMainFunction(t *testing.T) {
 	// Setup command line arguments
 	setUpArgs([]string{"cmd", "-id=node1", tempDir})
 
-	// Mock logrus logger
-	log := logrus.New()
-	log.SetOutput(ioutil.Discard)
-	log.SetLevel(logrus.DebugLevel)
-
 	// Run the main function in a goroutine to allow it to run asynchronously
 	go main()
 
@@ -44,7 +38,7 @@ func TestMainFunction(t *testing.T) {
 	// Perform HTTP request to verify the server is running
 	jsonStr := []byte(`{"ttl": 60}`)
 	resp, err := http.Post(
-		"http://127.0.0.1:11000/API/v1/locks/:key", "application/json", bytes.NewBuffer(jsonStr),
+		"http://127.0.0.1:11000/API/v1/locks/:key/acquire", "application/json", bytes.NewBuffer(jsonStr),
 	)
 	require.NoError(t, err)
 	defer resp.Body.Close()

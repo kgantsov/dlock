@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package lock;
+
+option go_package = "github.com/kgantsov/dlock/internal/proto;proto";
+
+service LockService {
+  rpc Acquire(AcquireReq) returns (AcquireResp);
+  rpc Release(ReleaseReq) returns (ReleaseResp);
+  rpc Renew(RenewReq) returns (RenewResp);
+}
+
+message AcquireReq {
+    string key = 1;
+    string owner = 2;
+    int64 ttl = 3;
+}
+message AcquireResp {
+    bool success = 1;
+    string error = 2;
+    string key = 3;
+    string owner = 4;       // client ID
+    uint64 fencing_token = 5; // monotonically increasing
+    int64 expire_at = 6;
+    int64 expires_in = 7;
+}
+
+message ReleaseReq {
+    string key = 1;
+    string owner = 2; // Owner must match the current lock owner
+    uint64 fencing_token = 3;   // optional safeguard
+}
+message ReleaseResp {
+    bool success = 1;
+    string error = 2;
+}
+
+message RenewReq {
+    string key = 1;
+    string owner = 2; // Owner must match the current lock owner
+    uint64 fencing_token = 3;   // optional safeguard
+    int64 ttl = 4;
+}
+message RenewResp {
+    bool success = 1;
+    string error = 2;
+    string key = 3;
+    string owner = 4; // Owner must match the current lock owner
+    uint64 fencing_token = 5;   // optional safeguard
+    int64 expire_at = 6;
+    int64 expires_in = 7; // Time in seconds until the lock expires
+}
+
+message AcquireRaftCommand {
+  string key = 1;
+  string owner = 2;
+  uint64 fencing_token = 3;   // optional safeguard
+  int64 expire_at = 4;
+}
+
+message ReleaseRaftCommand {
+  string key = 1;
+  string owner = 2;
+  uint64 fencing_token = 3;
+}
+
+message RenewRaftCommand {
+  string key = 1;
+  string owner = 2;
+  uint64 fencing_token = 3;
+  int64 expire_at = 4;
+}
+
+message RaftCommand {
+  oneof cmd {
+    AcquireRaftCommand acquire = 1;
+    ReleaseRaftCommand release = 2;
+    RenewRaftCommand renew = 3;
+  }
+}
+
+message LockEntry {
+  string key = 1;
+  string owner = 2;
+  uint64 fencing_token = 3;
+  int64 expire_at = 4;
+}
+
+message SnapshotItem {
+  oneof item {
+    LockEntry lock = 1;
+  }
+}

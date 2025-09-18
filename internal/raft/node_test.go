@@ -68,20 +68,26 @@ func TestStoreOpenSingleNode(t *testing.T) {
 	time.Sleep(3 * time.Second)
 	assert.True(t, becomeLeader)
 
-	err = n.Acquire("foo", 60)
+	lock, err := n.Acquire("foo", "owner-1", 60)
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = n.Acquire("foo", 60)
+	_, err = n.Acquire("foo", "owner-1", 60)
 	require.Error(t, err)
 
-	err = n.Release("foo")
+	err = n.Release("foo", "owner-2", lock.FencingToken)
+	require.Error(t, err)
+
+	err = n.Release("foo", "owner-1", 12312)
+	require.Error(t, err)
+
+	err = n.Release("foo", "owner-1", lock.FencingToken)
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = n.Acquire("foo", 60)
+	_, err = n.Acquire("foo", "owner-2", 60)
 	require.NoError(t, err)
 }
 
@@ -110,16 +116,16 @@ func TestStoreOpenSingleNodeWithTTL(t *testing.T) {
 	// Simple way to ensure there is a leader.
 	time.Sleep(3 * time.Second)
 
-	err = n.Acquire("foo", 2)
+	_, err = n.Acquire("foo", "owner-1", 2)
 	require.NoError(t, err)
 
 	// Wait for committed log entry to be applied.
 	time.Sleep(500 * time.Millisecond)
-	err = n.Acquire("foo", 2)
+	_, err = n.Acquire("foo", "owner-1", 2)
 	assert.Error(t, err)
 
 	time.Sleep(2 * time.Second)
-	err = n.Acquire("foo", 2)
+	_, err = n.Acquire("foo", "owner-1", 2)
 	require.NoError(t, err)
 }
 

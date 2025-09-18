@@ -14,15 +14,16 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/monitor"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/fiber/v2/middleware/requestid"
+	"github.com/kgantsov/dlock/internal/domain"
 )
 
-// Store is the interface Raft-backed key-value stores must implement.
-type Store interface {
+// Node is the interface Raft-backed key-value stores must implement.
+type Node interface {
 	// Acquire acquires a lock the given key if it wasn't acquired by somebody else.
-	Acquire(key string, ttl int) error
+	Acquire(key, owner string, ttl int64) (*domain.LockEntry, error)
 
 	// Release releases a lock for the given key.
-	Release(key string) error
+	Release(key, owner string, fencingToken uint64) error
 
 	// Join joins the node, identitifed by nodeID and reachable at addr, to the cluster.
 	Join(nodeID string, addr string) error
@@ -37,7 +38,7 @@ type Service struct {
 }
 
 // New returns an uninitialized HTTP service.
-func New(addr string, store Store) *Service {
+func New(addr string, node Node) *Service {
 
 	router := fiber.New()
 	api := humafiber.New(
@@ -45,7 +46,7 @@ func New(addr string, store Store) *Service {
 	)
 
 	h := &Handler{
-		store: store,
+		node: node,
 	}
 	h.ConfigureMiddleware(router)
 	h.RegisterRoutes(api)
@@ -96,7 +97,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 		huma.Operation{
 			OperationID: "acquire-lock",
 			Method:      http.MethodPost,
-			Path:        "/API/v1/locks/{key}",
+			Path:        "/API/v1/locks/{key}/acquire",
 			Summary:     "Acquire lock",
 			Description: "An endpoint that is used for acquiring a lock",
 			Tags:        []string{"Locks"},
@@ -107,8 +108,8 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 		api,
 		huma.Operation{
 			OperationID: "release-lock",
-			Method:      http.MethodDelete,
-			Path:        "/API/v1/locks/{key}",
+			Method:      http.MethodPost,
+			Path:        "/API/v1/locks/{key}/release",
 			Summary:     "Release lock",
 			Description: "An endpoint that is used for releasing a lock",
 			Tags:        []string{"Locks"},
