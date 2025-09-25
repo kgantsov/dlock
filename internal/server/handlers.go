@@ -33,6 +33,16 @@ func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOut
 	ttl := input.Body.TTL
 	owner := input.Body.Owner
 
+	if key == "" {
+		return nil, huma.Error400BadRequest("Key is required", domain.ErrInvalidKey)
+	}
+	if owner == "" {
+		return nil, huma.Error400BadRequest("Owner is required", domain.ErrInvalidOwner)
+	}
+	if ttl <= 0 {
+		return nil, huma.Error400BadRequest("TTL must be greater than zero", domain.ErrInvalidTTL)
+	}
+
 	lock, err := h.node.Acquire(key, owner, ttl)
 	if err != nil {
 		return nil, huma.Error409Conflict("Failed to acquire a lock", err)
@@ -53,6 +63,16 @@ func (h *Handler) Acquire(ctx context.Context, input *AcquireInput) (*AcquireOut
 func (h *Handler) Release(ctx context.Context, input *ReleaseInput) (*ReleaseOutput, error) {
 	key := input.Key
 	owner := input.Body.Owner
+
+	if key == "" {
+		return nil, huma.Error400BadRequest("Key is required", domain.ErrInvalidKey)
+	}
+	if owner == "" {
+		return nil, huma.Error400BadRequest("Owner is required", domain.ErrInvalidOwner)
+	}
+	if input.Body.FencingToken == "" {
+		return nil, huma.Error400BadRequest("Fencing token is required", domain.ErrInvalidFencingToken)
+	}
 
 	fencingToken, err := strconv.ParseUint(input.Body.FencingToken, 10, 64)
 	if err != nil {

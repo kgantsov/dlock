@@ -36,9 +36,9 @@ func TestMainFunction(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	// Perform HTTP request to verify the server is running
-	jsonStr := []byte(`{"ttl": 60}`)
+	jsonStr := []byte(`{"ttl": 60, "owner": "owner1"}`)
 	resp, err := http.Post(
-		"http://127.0.0.1:11000/API/v1/locks/:key/acquire", "application/json", bytes.NewBuffer(jsonStr),
+		"http://127.0.0.1:8000/API/v1/locks/:key/acquire", "application/json", bytes.NewBuffer(jsonStr),
 	)
 	require.NoError(t, err)
 	defer resp.Body.Close()

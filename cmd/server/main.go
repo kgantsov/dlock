@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"time"
@@ -12,18 +13,21 @@ import (
 	"github.com/rs/zerolog/log"
 
 	cluster "github.com/kgantsov/dlock/internal/cluster"
+	"github.com/kgantsov/dlock/internal/grpc"
 	"github.com/kgantsov/dlock/internal/raft"
 	server "github.com/kgantsov/dlock/internal/server"
 )
 
 // Command line defaults
 const (
-	DefaultHTTPAddr = "11000"
-	DefaultRaftAddr = "localhost:12000"
+	DefaultHTTPAddr = "8000"
+	DefaultGRPCAddr = "localhost:9000"
+	DefaultRaftAddr = "localhost:10000"
 )
 
 // Command line parameters
 var httpAddr string
+var grpcAddr string
 var raftAddr string
 var joinAddr string
 var nodeID string
@@ -38,6 +42,7 @@ func main() {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 
 	flag.StringVar(&httpAddr, "haddr", DefaultHTTPAddr, "Set the HTTP bind address")
+	flag.StringVar(&grpcAddr, "gaddr", DefaultGRPCAddr, "Set the gRPC bind address")
 	flag.StringVar(&raftAddr, "raddr", DefaultRaftAddr, "Set Raft bind address")
 	flag.StringVar(&joinAddr, "join", "", "Set join address, if any")
 	flag.StringVar(&nodeID, "id", "", "Node ID. If not set, same as Raft bind address")
@@ -122,6 +127,20 @@ func main() {
 	node.InitIDGenerator()
 
 	log.Info().Msgf("dlock started successfully, listening on http://%s", httpAddr)
+
+	lis, err := net.Listen("tcp", grpcAddr)
+	if err != nil {
+		log.Fatal().Msgf("failed to listen: %v", err)
+	}
+
+	grpcPort := lis.Addr().(*net.TCPAddr).Port
+	grpcServer, err := grpc.NewGRPCServer(node, grpcPort)
+	if err != nil {
+		log.Fatal().Msgf("failed to create GRPC server: %v", err)
+	}
+
+	go grpcServer.Serve(lis)
+	log.Info().Msgf("Started gRPC server on %s", grpcAddr)
 
 	terminate := make(chan os.Signal, 1)
 	signal.Notify(terminate, os.Interrupt)
