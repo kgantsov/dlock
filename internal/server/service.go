@@ -25,20 +25,23 @@ type Node interface {
 	// Release releases a lock for the given key.
 	Release(key, owner string, fencingToken uint64) error
 
-	// Join joins the node, identitifed by nodeID and reachable at addr, to the cluster.
-	Join(nodeID string, addr string) error
+	// Join joins the node, identitifed by nodeID and reachable at raftAddr, to the cluster.
+	Join(nodeID string, raftAddr, grpcAddr string) error
+
+	NodeID() string
+	SetNodeAddr(nodeID, raftAddr, grpcAddr string)
 }
 
 // Service provides HTTP service.
 type Service struct {
-	api    huma.API
-	router *fiber.App
-	h      *Handler
-	addr   string
+	api      huma.API
+	router   *fiber.App
+	h        *Handler
+	httpAddr string
 }
 
 // New returns an uninitialized HTTP service.
-func New(addr string, node Node) *Service {
+func New(httpAddr, grpcAddr, raftAddr string, node Node) *Service {
 
 	router := fiber.New()
 	api := humafiber.New(
@@ -46,16 +49,18 @@ func New(addr string, node Node) *Service {
 	)
 
 	h := &Handler{
-		node: node,
+		node:     node,
+		grpcAddr: grpcAddr,
+		raftAddr: raftAddr,
 	}
 	h.ConfigureMiddleware(router)
 	h.RegisterRoutes(api)
 
 	return &Service{
-		api:    api,
-		router: router,
-		h:      h,
-		addr:   addr,
+		api:      api,
+		router:   router,
+		h:        h,
+		httpAddr: httpAddr,
 	}
 }
 
@@ -120,7 +125,7 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 
 // Start starts the service.
 func (s *Service) Start() error {
-	return s.router.Listen(fmt.Sprintf(":%s", s.addr))
+	return s.router.Listen(fmt.Sprintf(":%s", s.httpAddr))
 }
 
 // Close closes the service.

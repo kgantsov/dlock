@@ -31,11 +31,17 @@ type command struct {
 	Time string `json:"time,omitempty"`
 }
 
+type NodeAddr struct {
+	Id       string `json:"id"`
+	RaftAddr string `json:"raft_addr"`
+	GRPCAddr string `json:"grpc_addr"`
+}
+
 // Node is a simple key-value store, where all changes are made via Raft consensus.
 type Node struct {
 	RaftDir  string
 	RaftBind string
-	ServerID raft.ServerID
+	serverID raft.ServerID
 
 	mu      sync.Mutex
 	storage storage.Storage
@@ -43,6 +49,9 @@ type Node struct {
 	db *badger.DB
 
 	leaderChangeFn func(bool)
+
+	nodesMu    sync.Mutex
+	nodesAddrs map[string]NodeAddr
 
 	valueLogGCInterval time.Duration
 
@@ -56,7 +65,10 @@ func NewNode(db *badger.DB) *Node {
 	return &Node{
 		leaderChangeFn:     func(bool) {},
 		valueLogGCInterval: 5 * time.Minute,
+		mu:                 sync.Mutex{},
 		db:                 db,
+		nodesMu:            sync.Mutex{},
+		nodesAddrs:         make(map[string]NodeAddr),
 	}
 }
 
@@ -71,21 +83,24 @@ func (n *Node) Open(enableSingle bool, localID string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
-	n.ServerID = config.LocalID
+	n.serverID = config.LocalID
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", n.RaftBind)
 	if err != nil {
+		log.Error().Msgf("Error resolving TCP address: %s", err)
 		return err
 	}
 	transport, err := raft.NewTCPTransport(n.RaftBind, addr, 3, 10*time.Second, os.Stderr)
 	if err != nil {
+		log.Error().Msgf("Error creating TCP transport: %s", err)
 		return err
 	}
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := raft.NewFileSnapshotStore(n.RaftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
+		log.Error().Msgf("Error creating file snapshot store: %s", err)
 		return fmt.Errorf("file snapshot store: %s", err)
 	}
 
@@ -103,6 +118,7 @@ func (n *Node) Open(enableSingle bool, localID string) error {
 	// Instantiate the Raft systems.
 	ra, err := raft.NewRaft(config, (*FSM)(n), logStore, stableStore, snapshots, transport)
 	if err != nil {
+		log.Error().Msgf("Error creating new Raft: %s", err)
 		return fmt.Errorf("new raft: %s", err)
 	}
 	n.raft = ra
@@ -134,9 +150,9 @@ func (n *Node) Open(enableSingle bool, localID string) error {
 func (n *Node) ListenToLeaderChanges() {
 	for isLeader := range n.raft.LeaderCh() {
 		if isLeader {
-			log.Info().Msgf("Node %s has become a leader", n.ServerID)
+			log.Info().Msgf("Node %s has become a leader", n.serverID)
 		} else {
-			log.Info().Msgf("Node %s lost leadership", n.ServerID)
+			log.Info().Msgf("Node %s lost leadership", n.serverID)
 		}
 		n.leaderChangeFn(isLeader)
 	}
@@ -156,7 +172,7 @@ func (n *Node) InitIDGenerator() error {
 
 	index := -1
 	for i, srv := range servers {
-		if srv.ID == n.ServerID {
+		if srv.ID == n.serverID {
 			index = i
 			break
 		}
@@ -180,9 +196,44 @@ func (n *Node) GenerateID() uint64 {
 	return uint64(n.idGenerator.Generate().Int64())
 }
 
+func (n *Node) getLeaderGrpcAddr() (string, error) {
+	leaderAddr, leaderId := n.raft.LeaderWithID()
+	if leaderAddr == "" {
+		return "", fmt.Errorf("no leader")
+	}
+
+	n.nodesMu.Lock()
+	defer n.nodesMu.Unlock()
+	leader, ok := n.nodesAddrs[string(leaderId)]
+	if !ok {
+		return "", fmt.Errorf("no leader info")
+	}
+
+	// parse raftPort and take the host name then parse the grpcPort and take the port
+	// and combine them to form grpcAddr
+	raftPort := leader.RaftAddr
+	grpcPort := leader.GRPCAddr
+	leaderHostname, _, err := net.SplitHostPort(raftPort)
+	if err != nil {
+		return "", err
+	}
+	_, grpcPortOnly, err := net.SplitHostPort(grpcPort)
+	if err != nil {
+		return "", err
+	}
+
+	return net.JoinHostPort(leaderHostname, grpcPortOnly), nil
+}
+
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
 func (n *Node) Acquire(key, owner string, ttl int64) (*domain.LockEntry, error) {
+
 	if n.raft.State() != raft.Leader {
+		leaderGrpcAddr, err := n.getLeaderGrpcAddr()
+		if err != nil {
+			log.Info().Err(err).Msg("failed to get leader gRPC address")
+		}
+		log.Info().Msgf("Known nodes: %v, leader gRPC address: %v", n.nodesAddrs, leaderGrpcAddr)
 		return nil, fmt.Errorf("not leader")
 	}
 
@@ -259,8 +310,8 @@ func (n *Node) Release(key, owner string, fencingToken uint64) error {
 
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
-func (n *Node) Join(nodeID, addr string) error {
-	log.Info().Msgf("received join request for remote node %s at %s", nodeID, addr)
+func (n *Node) Join(nodeID, raftAddr, grpcAddr string) error {
+	log.Info().Msgf("received join request for remote node %s at %s", nodeID, raftAddr)
 
 	configFuture := n.raft.GetConfiguration()
 	if err := configFuture.Error(); err != nil {
@@ -271,27 +322,45 @@ func (n *Node) Join(nodeID, addr string) error {
 	for _, srv := range configFuture.Configuration().Servers {
 		// If a node already exists with either the joining node's ID or address,
 		// that node may need to be removed from the config first.
-		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(addr) {
+		if srv.ID == raft.ServerID(nodeID) || srv.Address == raft.ServerAddress(raftAddr) {
 			// However if *both* the ID and the address are the same, then nothing -- not even
 			// a join operation -- is needed.
-			if srv.Address == raft.ServerAddress(addr) && srv.ID == raft.ServerID(nodeID) {
-				log.Info().Msgf("node %s at %s already member of cluster, ignoring join request", nodeID, addr)
+			if srv.Address == raft.ServerAddress(raftAddr) && srv.ID == raft.ServerID(nodeID) {
+				log.Info().Msgf("node %s at %s already member of cluster, ignoring join request", nodeID, raftAddr)
 				return nil
 			}
 
 			future := n.raft.RemoveServer(srv.ID, 0, 0)
 			if err := future.Error(); err != nil {
-				return fmt.Errorf("error removing existing node %s at %s: %s", nodeID, addr, err)
+				return fmt.Errorf("error removing existing node %s at %s: %s", nodeID, raftAddr, err)
 			}
 		}
 	}
 
-	f := n.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(addr), 0, 0)
+	f := n.raft.AddVoter(raft.ServerID(nodeID), raft.ServerAddress(raftAddr), 0, 0)
 	if f.Error() != nil {
 		return f.Error()
 	}
-	log.Info().Msgf("node %s at %s joined successfully", nodeID, addr)
+
+	n.SetNodeAddr(nodeID, raftAddr, grpcAddr)
+
+	log.Info().Msgf("node %s at %s joined successfully", nodeID, raftAddr)
 	return nil
+}
+
+func (n *Node) SetNodeAddr(nodeID, raftAddr, grpcAddr string) {
+	n.nodesMu.Lock()
+	defer n.nodesMu.Unlock()
+
+	n.nodesAddrs[nodeID] = NodeAddr{
+		Id:       nodeID,
+		RaftAddr: raftAddr,
+		GRPCAddr: grpcAddr,
+	}
+}
+
+func (n *Node) NodeID() string {
+	return string(n.serverID)
 }
 
 func (n *Node) RunValueLogGC() {

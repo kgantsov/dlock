@@ -9,20 +9,27 @@ import (
 	"time"
 
 	"github.com/kgantsov/dlock/internal/domain"
+	"github.com/kgantsov/dlock/internal/server"
 	"github.com/rs/zerolog/log"
 )
 
 type Joiner struct {
+	node server.Node
+
 	nodeID   string
 	raftAddr string
+	grpcAddr string
 	hosts    []string
 }
 
-func NewJoiner(nodeID, raftAddr string, hosts []string) *Joiner {
+func NewJoiner(node server.Node, nodeID, raftAddr, grpcAddr string, hosts []string) *Joiner {
 	log.Debug().Msgf("Creating new joiner: %s %s %v", nodeID, raftAddr, hosts)
 	j := &Joiner{
+		node: node,
+
 		nodeID:   nodeID,
 		raftAddr: raftAddr,
+		grpcAddr: grpcAddr,
 		hosts:    hosts,
 	}
 
@@ -42,7 +49,7 @@ func (j *Joiner) Join() error {
 		for _, host = range j.hosts {
 			log.Debug().Msgf("Trying to join: %s", host)
 
-			if err = j.join(host, j.raftAddr, j.nodeID); err == nil {
+			if err = j.join(j.nodeID, host, j.raftAddr); err == nil {
 				return nil
 			}
 		}
@@ -52,14 +59,19 @@ func (j *Joiner) Join() error {
 	return domain.ErrFailedToJoinNode
 }
 
-func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
-	b, err := json.Marshal(map[string]string{"addr": raftAddr, "id": nodeID})
+func (j *Joiner) join(nodeID, joinAddr, raftAddr string) error {
+	b, err := json.Marshal(map[string]string{
+		"id":        nodeID,
+		"raft_addr": raftAddr,
+		"grpc_addr": j.grpcAddr,
+	})
 	if err != nil {
 		return err
 	}
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/join", joinAddr), bytes.NewReader(b))
 	if err != nil {
+		log.Error().Msgf("Error creating a join request: %s", err)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -67,18 +79,34 @@ func (j *Joiner) join(joinAddr, raftAddr, nodeID string) error {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Error().Msgf("Error sending a join request: %s", err)
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Error().Msgf("Error joining a node, status code: %d", resp.StatusCode)
 		return domain.ErrFailedToJoinNode
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Error().Msgf("Error reading a join response: %s", err)
 		return err
 	}
-	log.Info().Msgf("JOINED %+v %+v", resp.StatusCode, string(body))
+
+	var joinResp struct {
+		ID       string `json:"id"`
+		RaftAddr string `json:"raft_addr"`
+		GrpcAddr string `json:"grpc_addr"`
+	}
+	if err := json.Unmarshal(body, &joinResp); err != nil {
+		return err
+	}
+
+	j.node.SetNodeAddr(joinResp.ID, joinResp.RaftAddr, joinResp.GrpcAddr)
+
+	log.Info().Msgf("JOINED %+v %+v", resp.StatusCode, joinResp)
+
 	return nil
 }

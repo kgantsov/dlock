@@ -17,16 +17,18 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	addr := "8080"
+	httpAddr := "8080"
+	grpcAddr := "localhost:12002"
+	raftAddr := "localhost:12001"
 	store := newTestStore()
 
-	service := New(addr, store)
+	service := New(httpAddr, grpcAddr, raftAddr, store)
 
 	assert.NotNil(t, service)
 	assert.NotNil(t, service.router)
 	assert.NotNil(t, service.api)
 	assert.NotNil(t, service.h)
-	assert.Equal(t, addr, service.addr)
+	assert.Equal(t, httpAddr, service.httpAddr)
 
 	tests := []struct {
 		description  string
@@ -199,13 +201,16 @@ func TestJoin(t *testing.T) {
 	store := newTestStore()
 
 	h := &Handler{
-		node: store,
+		node:     store,
+		grpcAddr: "localhost:9000",
+		raftAddr: "localhost:10000",
 	}
 	h.RegisterRoutes(api)
 
 	type SuccessOutput struct {
-		ID   string `json:"id"`
-		Addr string `json:"addr"`
+		ID       string `json:"id"`
+		RaftAddr string `json:"raft_addr"`
+		GrpcAddr string `json:"grpc_addr"`
 	}
 	type ErrorOutput struct {
 		Title  string `json:"title"`
@@ -214,8 +219,9 @@ func TestJoin(t *testing.T) {
 	}
 
 	resp := api.Post("/join", map[string]any{
-		"id":   "dlock-node-0",
-		"addr": "localhost:12001",
+		"id":        "dlock-node-1",
+		"raft_addr": "localhost:10001",
+		"grpc_addr": "localhost:9001",
 	})
 
 	successOutput := &SuccessOutput{}
@@ -224,7 +230,8 @@ func TestJoin(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.Code)
 	assert.Equal(t, "dlock-node-0", successOutput.ID)
-	assert.Equal(t, "localhost:12001", successOutput.Addr)
+	assert.Equal(t, "localhost:10000", successOutput.RaftAddr)
+	assert.Equal(t, "localhost:9000", successOutput.GrpcAddr)
 }
 
 type testStore struct {
@@ -273,6 +280,14 @@ func (t *testStore) Release(key, owner string, fencingToken uint64) error {
 	return nil
 }
 
-func (t *testStore) Join(nodeID, addr string) error {
+func (t *testStore) Join(nodeID, addr, grpcAddr string) error {
 	return nil
+}
+
+func (t *testStore) NodeID() string {
+	return "dlock-node-0"
+}
+
+func (t *testStore) SetNodeAddr(nodeID, raftAddr, grpcAddr string) {
+
 }
