@@ -6,7 +6,6 @@ type JoinInput struct {
 	Body struct {
 		ID       string `json:"id" example:"dlock-node-0" doc:"ID of a node"`
 		RaftAddr string `json:"raft_addr" example:"localhost:12001" doc:"IP address and a port of a service"`
-		GrpcAddr string `json:"grpc_addr" example:"localhost:12002" doc:"gRPC address and a port of a service"`
 	}
 }
 
@@ -14,7 +13,6 @@ type JoinOutput struct {
 	Body struct {
 		ID       string `json:"id" example:"dlock-node-0" doc:"ID of a node"`
 		RaftAddr string `json:"raft_addr" example:"localhost:12001" doc:"IP address and a port of a service"`
-		GrpcAddr string `json:"grpc_addr" example:"localhost:12002" doc:"gRPC address and a port of a service"`
 	}
 }
 

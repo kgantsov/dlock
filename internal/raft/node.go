@@ -11,6 +11,7 @@ import (
 	"github.com/bwmarrin/snowflake"
 	"github.com/dgraph-io/badger/v4"
 	"github.com/kgantsov/dlock/internal/domain"
+	"github.com/kgantsov/dlock/internal/grpc"
 	pb "github.com/kgantsov/dlock/internal/proto"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
@@ -31,16 +32,11 @@ type command struct {
 	Time string `json:"time,omitempty"`
 }
 
-type NodeAddr struct {
-	Id       string `json:"id"`
-	RaftAddr string `json:"raft_addr"`
-	GRPCAddr string `json:"grpc_addr"`
-}
-
 // Node is a simple key-value store, where all changes are made via Raft consensus.
 type Node struct {
 	RaftDir  string
 	RaftBind string
+	GrpcAddr string
 	serverID raft.ServerID
 
 	mu      sync.Mutex
@@ -50,12 +46,13 @@ type Node struct {
 
 	leaderChangeFn func(bool)
 
-	nodesMu    sync.Mutex
-	nodesAddrs map[string]NodeAddr
+	leaderConfig *LeaderConfig
 
 	valueLogGCInterval time.Duration
 
 	raft *raft.Raft // The consensus mechanism
+
+	proxy *grpc.Proxy
 
 	idGenerator *snowflake.Node
 }
@@ -67,8 +64,7 @@ func NewNode(db *badger.DB) *Node {
 		valueLogGCInterval: 5 * time.Minute,
 		mu:                 sync.Mutex{},
 		db:                 db,
-		nodesMu:            sync.Mutex{},
-		nodesAddrs:         make(map[string]NodeAddr),
+		proxy:              grpc.NewProxy(),
 	}
 }
 
@@ -84,6 +80,12 @@ func (n *Node) Open(enableSingle bool, localID string) error {
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(localID)
 	n.serverID = config.LocalID
+
+	n.leaderConfig = NewLeaderConfig(
+		localID,
+		n.RaftBind,
+		n.GrpcAddr,
+	)
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", n.RaftBind)
@@ -151,6 +153,7 @@ func (n *Node) ListenToLeaderChanges() {
 	for isLeader := range n.raft.LeaderCh() {
 		if isLeader {
 			log.Info().Msgf("Node %s has become a leader", n.serverID)
+			n.NotifyLeaderConfiguration()
 		} else {
 			log.Info().Msgf("Node %s lost leadership", n.serverID)
 		}
@@ -196,45 +199,39 @@ func (n *Node) GenerateID() uint64 {
 	return uint64(n.idGenerator.Generate().Int64())
 }
 
-func (n *Node) getLeaderGrpcAddr() (string, error) {
-	leaderAddr, leaderId := n.raft.LeaderWithID()
-	if leaderAddr == "" {
-		return "", fmt.Errorf("no leader")
+// NotifyLeaderConfiguration notifies followers that a new leader has been elected and sends its address.
+func (n *Node) NotifyLeaderConfiguration() error {
+	cmd := &pb.RaftCommand{
+		Cmd: &pb.RaftCommand_LeaderChangeConf{
+			LeaderChangeConf: &pb.LeaderChangeConfRaftCommand{
+				NodeId:   string(n.serverID),
+				RaftAddr: n.RaftBind,
+				GrpcAddr: n.GrpcAddr,
+			},
+		},
 	}
 
-	n.nodesMu.Lock()
-	defer n.nodesMu.Unlock()
-	leader, ok := n.nodesAddrs[string(leaderId)]
-	if !ok {
-		return "", fmt.Errorf("no leader info")
-	}
-
-	// parse raftPort and take the host name then parse the grpcPort and take the port
-	// and combine them to form grpcAddr
-	raftPort := leader.RaftAddr
-	grpcPort := leader.GRPCAddr
-	leaderHostname, _, err := net.SplitHostPort(raftPort)
+	data, err := proto.Marshal(cmd)
 	if err != nil {
-		return "", err
-	}
-	_, grpcPortOnly, err := net.SplitHostPort(grpcPort)
-	if err != nil {
-		return "", err
+		return err
 	}
 
-	return net.JoinHostPort(leaderHostname, grpcPortOnly), nil
+	f := n.raft.Apply(data, raftTimeout)
+
+	if f.Error() != nil {
+		return f.Error()
+	}
+
+	return nil
 }
 
 // Acquire acquires a lock the given key if it wasn't acquired by somebody else.
 func (n *Node) Acquire(key, owner string, ttl int64) (*domain.LockEntry, error) {
 
 	if n.raft.State() != raft.Leader {
-		leaderGrpcAddr, err := n.getLeaderGrpcAddr()
-		if err != nil {
-			log.Info().Err(err).Msg("failed to get leader gRPC address")
-		}
-		log.Info().Msgf("Known nodes: %v, leader gRPC address: %v", n.nodesAddrs, leaderGrpcAddr)
-		return nil, fmt.Errorf("not leader")
+		leaderGrpcAddr := n.leaderConfig.GetLeaderGrpcAddress()
+
+		return n.proxy.Acquire(leaderGrpcAddr, key, owner, ttl)
 	}
 
 	expireAt := time.Now().UTC().Add(time.Second * time.Duration(ttl))
@@ -277,7 +274,9 @@ func (n *Node) Acquire(key, owner string, ttl int64) (*domain.LockEntry, error) 
 // Release releases a lock for the given key.
 func (n *Node) Release(key, owner string, fencingToken uint64) error {
 	if n.raft.State() != raft.Leader {
-		return fmt.Errorf("not leader")
+		leaderGrpcAddr := n.leaderConfig.GetLeaderGrpcAddress()
+
+		return n.proxy.Release(leaderGrpcAddr, key, owner, fencingToken)
 	}
 
 	cmd := &pb.RaftCommand{
@@ -310,7 +309,7 @@ func (n *Node) Release(key, owner string, fencingToken uint64) error {
 
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
-func (n *Node) Join(nodeID, raftAddr, grpcAddr string) error {
+func (n *Node) Join(nodeID, raftAddr string) error {
 	log.Info().Msgf("received join request for remote node %s at %s", nodeID, raftAddr)
 
 	configFuture := n.raft.GetConfiguration()
@@ -342,21 +341,8 @@ func (n *Node) Join(nodeID, raftAddr, grpcAddr string) error {
 		return f.Error()
 	}
 
-	n.SetNodeAddr(nodeID, raftAddr, grpcAddr)
-
 	log.Info().Msgf("node %s at %s joined successfully", nodeID, raftAddr)
 	return nil
-}
-
-func (n *Node) SetNodeAddr(nodeID, raftAddr, grpcAddr string) {
-	n.nodesMu.Lock()
-	defer n.nodesMu.Unlock()
-
-	n.nodesAddrs[nodeID] = NodeAddr{
-		Id:       nodeID,
-		RaftAddr: raftAddr,
-		GRPCAddr: grpcAddr,
-	}
 }
 
 func (n *Node) NodeID() string {

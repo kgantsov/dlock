@@ -5,89 +5,83 @@ import (
 
 	"github.com/kgantsov/dlock/internal/domain"
 	pb "github.com/kgantsov/dlock/internal/proto"
-	"github.com/kgantsov/dlock/internal/raft"
+	"github.com/kgantsov/dlock/internal/server"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
-
-type LockNode interface {
-	Acquire(key, owner string, ttl int64) (*domain.LockEntry, error)
-	Release(key, owner string, fencingToken uint64) error
-}
-
 type SyncroLockServer struct {
 	pb.UnimplementedLockServiceServer
-	node LockNode
+	node server.Node
 	port int
 }
 
-func NewSyncroLockServer(node LockNode, port int) *SyncroLockServer {
-       return &SyncroLockServer{
-	       node: node,
-	       port: port,
-       }
+func NewSyncroLockServer(node server.Node, port int) *SyncroLockServer {
+	return &SyncroLockServer{
+		node: node,
+		port: port,
+	}
 }
 
-func NewGRPCServer(node *raft.Node, port int) (*grpc.Server, error) {
+func NewGRPCServer(node server.Node, port int) (*grpc.Server, error) {
 	grpcServer := grpc.NewServer()
 	pb.RegisterLockServiceServer(grpcServer, NewSyncroLockServer(node, port))
 	return grpcServer, nil
 }
 
 func (s *SyncroLockServer) Acquire(ctx context.Context, req *pb.AcquireReq) (*pb.AcquireResp, error) {
-       if req.Key == "" {
-	       return nil, domain.ErrInvalidKey
-       }
-       if req.Owner == "" {
-	       return nil, domain.ErrInvalidOwner
-       }
-       if req.Ttl <= 0 {
-	       return nil, domain.ErrInvalidTTL
-       }
+	if req.Key == "" {
+		return nil, domain.ErrInvalidKey
+	}
+	if req.Owner == "" {
+		return nil, domain.ErrInvalidOwner
+	}
+	if req.Ttl <= 0 {
+		return nil, domain.ErrInvalidTTL
+	}
 
-       lock, err := s.node.Acquire(req.Key, req.Owner, req.Ttl)
-       if err != nil {
-	       return &pb.AcquireResp{
-		       Success: false,
-	       }, err
-       }
+	lock, err := s.node.Acquire(req.Key, req.Owner, req.Ttl)
+	if err != nil {
+		return &pb.AcquireResp{
+			Success: false,
+		}, err
+	}
 
-       resp := &pb.AcquireResp{
-	       Success:      true,
-	       Key:          req.Key,
-	       Owner:        lock.Owner,
-	       FencingToken: lock.FencingToken,
-	       ExpireAt:     lock.ExpireAt,
-	       ExpiresIn:    req.Ttl,
-       }
+	resp := &pb.AcquireResp{
+		Success:      true,
+		Key:          req.Key,
+		Owner:        lock.Owner,
+		FencingToken: lock.FencingToken,
+		ExpireAt:     lock.ExpireAt,
+		ExpiresIn:    req.Ttl,
+	}
 
-       log.Info().Msgf("Acquire: key=%s, owner=%s, ttl=%d, acquired=%v", req.Key, req.Owner, req.Ttl, lock)
+	log.Info().Msgf("Acquire: key=%s, owner=%s, ttl=%d, acquired=%v", req.Key, req.Owner, req.Ttl, lock)
 
-       return resp, nil
+	return resp, nil
 }
 
 func (s *SyncroLockServer) Release(ctx context.Context, req *pb.ReleaseReq) (*pb.ReleaseResp, error) {
-       if req.Key == "" {
-	       return nil, domain.ErrInvalidKey
-       }
-       if req.Owner == "" {
-	       return nil, domain.ErrInvalidOwner
-       }
-       if req.FencingToken == 0 {
-	       return nil, domain.ErrInvalidFencingToken
-       }
+	if req.Key == "" {
+		return nil, domain.ErrInvalidKey
+	}
+	if req.Owner == "" {
+		return nil, domain.ErrInvalidOwner
+	}
+	if req.FencingToken == 0 {
+		return nil, domain.ErrInvalidFencingToken
+	}
 
-       err := s.node.Release(req.Key, req.Owner, req.FencingToken)
-       if err != nil {
-	       return &pb.ReleaseResp{
-		       Success: false,
-	       }, err
-       }
-       resp := &pb.ReleaseResp{
-	       Success: true,
-       }
+	err := s.node.Release(req.Key, req.Owner, req.FencingToken)
+	if err != nil {
+		return &pb.ReleaseResp{
+			Success: false,
+		}, err
+	}
+	resp := &pb.ReleaseResp{
+		Success: true,
+	}
 
-       log.Info().Msgf("Release: key=%s, owner=%s", req.Key, req.Owner)
-       return resp, nil
+	log.Info().Msgf("Release: key=%s, owner=%s", req.Key, req.Owner)
+	return resp, nil
 }

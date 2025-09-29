@@ -28,8 +28,8 @@ func (m *MockNode) Release(key, owner string, fencingToken uint64) error {
 	return args.Error(0)
 }
 
-func (m *MockNode) Join(nodeID, raftAddr, grpcAddr string) error {
-	args := m.Called(nodeID, raftAddr, grpcAddr)
+func (m *MockNode) Join(nodeID, raftAddr string) error {
+	args := m.Called(nodeID, raftAddr)
 	return args.Error(0)
 }
 func (m *MockNode) NodeID() string {
@@ -37,13 +37,8 @@ func (m *MockNode) NodeID() string {
 	return args.String(0)
 }
 
-func (m *MockNode) SetNodeAddr(nodeID, raftAddr, grpcAddr string) {
-	m.Called(nodeID, raftAddr, grpcAddr)
-}
-
 // TestJoiner tests the Joiner.
 func TestJoiner(t *testing.T) {
-	node := &MockNode{}
 	// Start a local HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Test request parameters
@@ -55,13 +50,11 @@ func TestJoiner(t *testing.T) {
 	// Close the server when test finishes
 	defer server.Close()
 
-	node.On("SetNodeAddr", "node0", "raftAddr", "grpcAddr").Return(nil)
-
 	// get host name and port from server.URL
 	host := server.URL[len("http://"):]
 
 	hosts := []string{host}
-	j := NewJoiner(node, "node0", "raftAddr", "grpcAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -110,10 +103,7 @@ func TestJoinerRetry(t *testing.T) {
 	host2 := server2.URL[len("http://"):]
 
 	hosts := []string{host1, host2}
-	node := &MockNode{}
-	j := NewJoiner(node, "node0", "raftAddr", "grpcAddr", hosts)
-
-	node.On("SetNodeAddr", "node0", "raftAddr", "grpcAddr").Return(nil)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -123,7 +113,7 @@ func TestJoinerRetry(t *testing.T) {
 
 func TestJoinerNoHosts(t *testing.T) {
 	hosts := []string{}
-	j := NewJoiner(&MockNode{}, "node0", "raftAddr", "grpcAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 
@@ -134,7 +124,7 @@ func TestJoinerNoHosts(t *testing.T) {
 
 func TestJoinerHostsUnavailable(t *testing.T) {
 	hosts := []string{"host1", "host2"}
-	j := NewJoiner(&MockNode{}, "node0", "raftAddr", "grpcAddr", hosts)
+	j := NewJoiner("node0", "raftAddr", hosts)
 
 	assert.NotNil(t, j)
 

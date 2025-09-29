@@ -9,27 +9,20 @@ import (
 	"time"
 
 	"github.com/kgantsov/dlock/internal/domain"
-	"github.com/kgantsov/dlock/internal/server"
 	"github.com/rs/zerolog/log"
 )
 
 type Joiner struct {
-	node server.Node
-
 	nodeID   string
 	raftAddr string
-	grpcAddr string
 	hosts    []string
 }
 
-func NewJoiner(node server.Node, nodeID, raftAddr, grpcAddr string, hosts []string) *Joiner {
+func NewJoiner(nodeID, raftAddr string, hosts []string) *Joiner {
 	log.Debug().Msgf("Creating new joiner: %s %s %v", nodeID, raftAddr, hosts)
 	j := &Joiner{
-		node: node,
-
 		nodeID:   nodeID,
 		raftAddr: raftAddr,
-		grpcAddr: grpcAddr,
 		hosts:    hosts,
 	}
 
@@ -63,7 +56,6 @@ func (j *Joiner) join(nodeID, joinAddr, raftAddr string) error {
 	b, err := json.Marshal(map[string]string{
 		"id":        nodeID,
 		"raft_addr": raftAddr,
-		"grpc_addr": j.grpcAddr,
 	})
 	if err != nil {
 		return err
@@ -98,13 +90,10 @@ func (j *Joiner) join(nodeID, joinAddr, raftAddr string) error {
 	var joinResp struct {
 		ID       string `json:"id"`
 		RaftAddr string `json:"raft_addr"`
-		GrpcAddr string `json:"grpc_addr"`
 	}
 	if err := json.Unmarshal(body, &joinResp); err != nil {
 		return err
 	}
-
-	j.node.SetNodeAddr(joinResp.ID, joinResp.RaftAddr, joinResp.GrpcAddr)
 
 	log.Info().Msgf("JOINED %+v %+v", resp.StatusCode, joinResp)
 

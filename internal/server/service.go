@@ -26,10 +26,9 @@ type Node interface {
 	Release(key, owner string, fencingToken uint64) error
 
 	// Join joins the node, identitifed by nodeID and reachable at raftAddr, to the cluster.
-	Join(nodeID string, raftAddr, grpcAddr string) error
+	Join(nodeID string, raftAddr string) error
 
 	NodeID() string
-	SetNodeAddr(nodeID, raftAddr, grpcAddr string)
 }
 
 // Service provides HTTP service.
@@ -41,7 +40,7 @@ type Service struct {
 }
 
 // New returns an uninitialized HTTP service.
-func New(httpAddr, grpcAddr, raftAddr string, node Node) *Service {
+func New(httpAddr string, node Node) *Service {
 
 	router := fiber.New()
 	api := humafiber.New(
@@ -49,9 +48,7 @@ func New(httpAddr, grpcAddr, raftAddr string, node Node) *Service {
 	)
 
 	h := &Handler{
-		node:     node,
-		grpcAddr: grpcAddr,
-		raftAddr: raftAddr,
+		node: node,
 	}
 	h.ConfigureMiddleware(router)
 	h.RegisterRoutes(api)

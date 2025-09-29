@@ -28,6 +28,16 @@ func (m *MockNode) Release(key, owner string, fencingToken uint64) error {
 	return args.Error(0)
 }
 
+func (m *MockNode) Join(nodeID, raftAddr string) error {
+	args := m.Called(nodeID, raftAddr)
+	return args.Error(0)
+}
+
+func (m *MockNode) NodeID() string {
+	args := m.Called()
+	return args.String(0)
+}
+
 func TestSyncroLockServer_Acquire(t *testing.T) {
 	node := new(MockNode)
 	server := NewSyncroLockServer(node, 1234)

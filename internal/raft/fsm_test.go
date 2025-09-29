@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/raft"
 	"github.com/kgantsov/dlock/internal/storage"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -110,7 +111,14 @@ func TestFSM_Restore(t *testing.T) {
 	store := storage.NewBadgerStorage(db)
 	require.NoError(t, err)
 
-	fsm := &FSM{storage: store}
+	fsm := &FSM{
+		storage: store,
+		leaderConfig: NewLeaderConfig(
+			"node-1",
+			"raft-addr-1",
+			"grpc-addr-1",
+		),
+	}
 
 	_, err = store.Acquire("test-lock-1", "", 0, time.Now().UTC().Add(time.Second*10))
 	require.NoError(t, err)
@@ -155,11 +163,26 @@ func TestFSM_Restore(t *testing.T) {
 	defer os.RemoveAll(tmpDir2)
 	// Reinitialize the store for restore
 
-	fsm.storage = store
+	fsm = &FSM{
+		storage: store,
+		leaderConfig: NewLeaderConfig(
+			"node-2",
+			"raft-addr-2",
+			"grpc-addr-2",
+		),
+	}
+
+	assert.Equal(t, "node-2", fsm.leaderConfig.Id)
+	assert.Equal(t, "raft-addr-2", fsm.leaderConfig.RaftAddr)
+	assert.Equal(t, "grpc-addr-2", fsm.leaderConfig.GrpcAddr)
 
 	// Restore from the snapshot
 	err = fsm.Restore(io.NopCloser(sink))
 	require.NoError(t, err)
+
+	assert.Equal(t, "node-1", fsm.leaderConfig.Id)
+	assert.Equal(t, "raft-addr-1", fsm.leaderConfig.RaftAddr)
+	assert.Equal(t, "grpc-addr-1", fsm.leaderConfig.GrpcAddr)
 
 	// Check if the state is correctly restored
 	fsm.mu.Lock()

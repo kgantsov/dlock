@@ -105,12 +105,13 @@ func main() {
 	}
 
 	node.RaftBind = raftAddr
+	node.GrpcAddr = grpcAddr
 
 	if err := node.Open(true, nodeID); err != nil {
 		log.Fatal().Msgf("failed to open store: %s", err.Error())
 	}
 
-	h := server.New(httpAddr, grpcAddr, raftAddr, node)
+	h := server.New(httpAddr, node)
 	go func() {
 		if err := h.Start(); err != nil {
 			log.Error().Msgf("failed to start HTTP service: %s", err.Error())
@@ -118,7 +119,7 @@ func main() {
 	}()
 
 	// If join was specified, make the join request.
-	j = cluster.NewJoiner(node, nodeID, raftAddr, grpcAddr, hosts)
+	j = cluster.NewJoiner(nodeID, raftAddr, hosts)
 
 	if err := j.Join(); err != nil {
 		log.Fatal().Msg(err.Error())

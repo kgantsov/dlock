@@ -1,14 +1,13 @@
 package raft
 
 import (
-	"bufio"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/kgantsov/dlock/internal/domain"
 	pb "github.com/kgantsov/dlock/internal/proto"
+	"github.com/kgantsov/dlock/internal/storage"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/proto"
 )
@@ -30,6 +29,8 @@ func (f *FSM) Apply(raftLog *raft.Log) interface{} {
 	}
 
 	switch command := c.Cmd.(type) {
+	case *pb.RaftCommand_LeaderChangeConf:
+		return f.applyLeaderChangeConf(command)
 	case *pb.RaftCommand_Acquire:
 		return f.applyAcquire(command)
 	case *pb.RaftCommand_Release:
@@ -44,7 +45,7 @@ func (f *FSM) Snapshot() (raft.FSMSnapshot, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	snapshot := &FSMSnapshot{storage: f.storage}
+	snapshot := &FSMSnapshot{storage: f.storage, leaderConfig: f.leaderConfig}
 	return snapshot, nil
 }
 
@@ -55,38 +56,77 @@ func (f *FSM) Restore(rc io.ReadCloser) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
-	scanner := bufio.NewScanner(rc)
 	linesTotal := 0
 	linesRestored := 0
-	log.Debug().Msgf("Restoring snapshot!@")
-	for scanner.Scan() {
-		line := scanner.Bytes()
+
+	log.Info().Msgf("Restoring snapshot...")
+
+	for {
+		item, err := storage.ReadSnapshotItem(rc)
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
 		linesTotal++
 
-		lock, err := domain.LockEntryFromBytes(line)
-		if err != nil {
-			log.Warn().Msgf("Failed to unmarshal command: %v %v", err, string(line))
-			continue
+		switch v := item.Item.(type) {
+		case *pb.SnapshotItem_LeaderConf:
+			log.Debug().
+				Str("node_id", v.LeaderConf.NodeId).
+				Str("raft_addr", v.LeaderConf.RaftAddr).
+				Str("grpc_addr", v.LeaderConf.GrpcAddr).
+				Msg("Restoring leader configuration")
+
+			f.leaderConfig.Set(
+				v.LeaderConf.NodeId,
+				v.LeaderConf.RaftAddr,
+				v.LeaderConf.GrpcAddr,
+			)
+		case *pb.SnapshotItem_Lock:
+			log.Debug().
+				Str("key", v.Lock.Key).
+				Str("owner", v.Lock.Owner).
+				Uint64("fencing_token", v.Lock.FencingToken).
+				Str("expire_at", time.Unix(v.Lock.ExpireAt, 0).String()).
+				Msg("Restoring lock")
+
+			_, err = f.storage.Acquire(
+				v.Lock.Key, v.Lock.Owner, v.Lock.FencingToken, time.Unix(v.Lock.ExpireAt, 0),
+			)
+
+			if err != nil {
+				log.Error().Err(err).Msgf("failed to restore lock for key %s", v.Lock.Key)
+				continue
+			}
+
+			linesRestored++
+		default:
+			return fmt.Errorf("unknown item in snapshot")
 		}
 
-		_, err = f.storage.Acquire(lock.Key, lock.Owner, lock.FencingToken, time.Unix(lock.ExpireAt, 0))
-		if err != nil {
-			continue
-		}
 		linesRestored++
-	}
-	if err := scanner.Err(); err != nil {
-		log.Info().Msgf(
-			"Error while reading snapshot: %v. Restored %d out of %d lines",
-			err,
-			linesRestored,
-			linesTotal,
-		)
-		return err
 	}
 
 	log.Info().Msgf("Restored %d out of %d lines", linesRestored, linesTotal)
 
+	return nil
+}
+
+func (f *FSM) applyLeaderChangeConf(payload *pb.RaftCommand_LeaderChangeConf) interface{} {
+	log.Info().Msgf(
+		"Leader changed: %s at %s (gRPC: %s)",
+		payload.LeaderChangeConf.NodeId,
+		payload.LeaderChangeConf.RaftAddr,
+		payload.LeaderChangeConf.GrpcAddr,
+	)
+
+	f.leaderConfig.Set(
+		payload.LeaderChangeConf.NodeId,
+		payload.LeaderChangeConf.RaftAddr,
+		payload.LeaderChangeConf.GrpcAddr,
+	)
 	return nil
 }
 

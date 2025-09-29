@@ -51,6 +51,12 @@ message RenewResp {
     int64 expires_in = 7; // Time in seconds until the lock expires
 }
 
+message LeaderChangeConfRaftCommand {
+  string node_id = 1;
+  string raft_addr = 2;
+  string grpc_addr = 3;
+}
+
 message AcquireRaftCommand {
   string key = 1;
   string owner = 2;
@@ -73,10 +79,17 @@ message RenewRaftCommand {
 
 message RaftCommand {
   oneof cmd {
-    AcquireRaftCommand acquire = 1;
-    ReleaseRaftCommand release = 2;
-    RenewRaftCommand renew = 3;
+    LeaderChangeConfRaftCommand leader_change_conf = 1;
+    AcquireRaftCommand acquire = 2;
+    ReleaseRaftCommand release = 3;
+    RenewRaftCommand renew = 4;
   }
+}
+
+message LeaderConfiguration  {
+  string node_id = 1;
+  string raft_addr = 2;
+  string grpc_addr = 3;
 }
 
 message LockEntry {
@@ -88,6 +101,7 @@ message LockEntry {
 
 message SnapshotItem {
   oneof item {
-    LockEntry lock = 1;
+    LeaderConfiguration leader_conf = 1;
+    LockEntry lock = 2;
   }
 }

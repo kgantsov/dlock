@@ -13,21 +13,17 @@ import (
 type (
 	Handler struct {
 		node Node
-
-		grpcAddr string
-		raftAddr string
 	}
 )
 
 func (h *Handler) Join(ctx context.Context, input *JoinInput) (*JoinOutput, error) {
-	if err := h.node.Join(input.Body.ID, input.Body.RaftAddr, input.Body.GrpcAddr); err != nil {
+	if err := h.node.Join(input.Body.ID, input.Body.RaftAddr); err != nil {
 		return &JoinOutput{}, err
 	}
 
 	res := &JoinOutput{}
-	res.Body.ID = h.node.NodeID()
-	res.Body.RaftAddr = h.raftAddr
-	res.Body.GrpcAddr = h.grpcAddr
+	res.Body.ID = input.Body.ID
+	res.Body.RaftAddr = input.Body.RaftAddr
 
 	return res, nil
 }

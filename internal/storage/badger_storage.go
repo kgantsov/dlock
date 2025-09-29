@@ -1,16 +1,22 @@
 package storage
 
 import (
+	"fmt"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/kgantsov/dlock/internal/domain"
+	pb "github.com/kgantsov/dlock/internal/proto"
 	"github.com/rs/zerolog/log"
 )
 
 type BadgerStorage struct {
 	db *badger.DB
+
+	mu             sync.RWMutex
+	leaderGrpcAddr string
 }
 
 type LockEntry struct {
@@ -25,7 +31,6 @@ func NewBadgerStorage(db *badger.DB) *BadgerStorage {
 		db: db,
 	}
 }
-
 func (s *BadgerStorage) Acquire(key, owner string, fencingToken uint64, expireAt time.Time) (*domain.LockEntry, error) {
 	log.Debug().Msgf("Acquiring lock for key: %s", key)
 
@@ -142,7 +147,7 @@ func (s *BadgerStorage) Locks() []string {
 	return keys
 }
 
-func (s *BadgerStorage) PersistSnapshot(w io.Writer) error {
+func (s *BadgerStorage) PersistSnapshot(sink io.Writer) error {
 	txn := s.db.NewTransaction(false)
 	defer txn.Discard()
 
@@ -168,29 +173,22 @@ func (s *BadgerStorage) PersistSnapshot(w io.Writer) error {
 			continue
 		}
 
-		lock, err := domain.LockEntryFromBytes(val)
+		lock, err := domain.LockEntryProtoFromBytes(val)
 		if err != nil {
 			log.Debug().Msgf("Error unmarshaling key %s %v", key[:len(dbLock)], err)
 			continue
 		}
 
-		var valueExpireAt time.Time
-		err = valueExpireAt.UnmarshalBinary(val)
-
-		if err == nil {
-			if time.Now().After(time.Unix(lock.ExpireAt, 0)) {
-				// Skip expired locks
-				continue
-			}
-		}
-
-		if _, err := w.Write(val); err != nil {
-			log.Debug().Msgf("Error writing key %s %v %v", key[:len(dbLock)], lock, err)
+		if time.Now().After(time.Unix(lock.ExpireAt, 0)) {
+			// Skip expired locks
 			continue
 		}
-		if _, err := w.Write([]byte("\n")); err != nil {
-			log.Debug().Msgf("Error writing key %s %v", key[:len(dbLock)], lock)
-			continue
+
+		snapshotItem := &pb.SnapshotItem{
+			Item: &pb.SnapshotItem_Lock{Lock: lock},
+		}
+		if err := WriteSnapshotItem(sink, snapshotItem); err != nil {
+			return fmt.Errorf("failed to write message snapshot item: %v", err)
 		}
 		cnt += 1
 	}

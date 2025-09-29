@@ -445,6 +445,66 @@ func (x *RenewResp) GetExpiresIn() int64 {
 	return 0
 }
 
+type LeaderChangeConfRaftCommand struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	RaftAddr      string                 `protobuf:"bytes,2,opt,name=raft_addr,json=raftAddr,proto3" json:"raft_addr,omitempty"`
+	GrpcAddr      string                 `protobuf:"bytes,3,opt,name=grpc_addr,json=grpcAddr,proto3" json:"grpc_addr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaderChangeConfRaftCommand) Reset() {
+	*x = LeaderChangeConfRaftCommand{}
+	mi := &file_internal_proto_lock_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaderChangeConfRaftCommand) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaderChangeConfRaftCommand) ProtoMessage() {}
+
+func (x *LeaderChangeConfRaftCommand) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_lock_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaderChangeConfRaftCommand.ProtoReflect.Descriptor instead.
+func (*LeaderChangeConfRaftCommand) Descriptor() ([]byte, []int) {
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *LeaderChangeConfRaftCommand) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *LeaderChangeConfRaftCommand) GetRaftAddr() string {
+	if x != nil {
+		return x.RaftAddr
+	}
+	return ""
+}
+
+func (x *LeaderChangeConfRaftCommand) GetGrpcAddr() string {
+	if x != nil {
+		return x.GrpcAddr
+	}
+	return ""
+}
+
 type AcquireRaftCommand struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
@@ -457,7 +517,7 @@ type AcquireRaftCommand struct {
 
 func (x *AcquireRaftCommand) Reset() {
 	*x = AcquireRaftCommand{}
-	mi := &file_internal_proto_lock_proto_msgTypes[6]
+	mi := &file_internal_proto_lock_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -469,7 +529,7 @@ func (x *AcquireRaftCommand) String() string {
 func (*AcquireRaftCommand) ProtoMessage() {}
 
 func (x *AcquireRaftCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[6]
+	mi := &file_internal_proto_lock_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -482,7 +542,7 @@ func (x *AcquireRaftCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AcquireRaftCommand.ProtoReflect.Descriptor instead.
 func (*AcquireRaftCommand) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{6}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *AcquireRaftCommand) GetKey() string {
@@ -524,7 +584,7 @@ type ReleaseRaftCommand struct {
 
 func (x *ReleaseRaftCommand) Reset() {
 	*x = ReleaseRaftCommand{}
-	mi := &file_internal_proto_lock_proto_msgTypes[7]
+	mi := &file_internal_proto_lock_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -536,7 +596,7 @@ func (x *ReleaseRaftCommand) String() string {
 func (*ReleaseRaftCommand) ProtoMessage() {}
 
 func (x *ReleaseRaftCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[7]
+	mi := &file_internal_proto_lock_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -549,7 +609,7 @@ func (x *ReleaseRaftCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReleaseRaftCommand.ProtoReflect.Descriptor instead.
 func (*ReleaseRaftCommand) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{7}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ReleaseRaftCommand) GetKey() string {
@@ -585,7 +645,7 @@ type RenewRaftCommand struct {
 
 func (x *RenewRaftCommand) Reset() {
 	*x = RenewRaftCommand{}
-	mi := &file_internal_proto_lock_proto_msgTypes[8]
+	mi := &file_internal_proto_lock_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -597,7 +657,7 @@ func (x *RenewRaftCommand) String() string {
 func (*RenewRaftCommand) ProtoMessage() {}
 
 func (x *RenewRaftCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[8]
+	mi := &file_internal_proto_lock_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -610,7 +670,7 @@ func (x *RenewRaftCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RenewRaftCommand.ProtoReflect.Descriptor instead.
 func (*RenewRaftCommand) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{8}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *RenewRaftCommand) GetKey() string {
@@ -645,6 +705,7 @@ type RaftCommand struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Cmd:
 	//
+	//	*RaftCommand_LeaderChangeConf
 	//	*RaftCommand_Acquire
 	//	*RaftCommand_Release
 	//	*RaftCommand_Renew
@@ -655,7 +716,7 @@ type RaftCommand struct {
 
 func (x *RaftCommand) Reset() {
 	*x = RaftCommand{}
-	mi := &file_internal_proto_lock_proto_msgTypes[9]
+	mi := &file_internal_proto_lock_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -667,7 +728,7 @@ func (x *RaftCommand) String() string {
 func (*RaftCommand) ProtoMessage() {}
 
 func (x *RaftCommand) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[9]
+	mi := &file_internal_proto_lock_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -680,12 +741,21 @@ func (x *RaftCommand) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RaftCommand.ProtoReflect.Descriptor instead.
 func (*RaftCommand) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{9}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RaftCommand) GetCmd() isRaftCommand_Cmd {
 	if x != nil {
 		return x.Cmd
+	}
+	return nil
+}
+
+func (x *RaftCommand) GetLeaderChangeConf() *LeaderChangeConfRaftCommand {
+	if x != nil {
+		if x, ok := x.Cmd.(*RaftCommand_LeaderChangeConf); ok {
+			return x.LeaderChangeConf
+		}
 	}
 	return nil
 }
@@ -721,23 +791,89 @@ type isRaftCommand_Cmd interface {
 	isRaftCommand_Cmd()
 }
 
+type RaftCommand_LeaderChangeConf struct {
+	LeaderChangeConf *LeaderChangeConfRaftCommand `protobuf:"bytes,1,opt,name=leader_change_conf,json=leaderChangeConf,proto3,oneof"`
+}
+
 type RaftCommand_Acquire struct {
-	Acquire *AcquireRaftCommand `protobuf:"bytes,1,opt,name=acquire,proto3,oneof"`
+	Acquire *AcquireRaftCommand `protobuf:"bytes,2,opt,name=acquire,proto3,oneof"`
 }
 
 type RaftCommand_Release struct {
-	Release *ReleaseRaftCommand `protobuf:"bytes,2,opt,name=release,proto3,oneof"`
+	Release *ReleaseRaftCommand `protobuf:"bytes,3,opt,name=release,proto3,oneof"`
 }
 
 type RaftCommand_Renew struct {
-	Renew *RenewRaftCommand `protobuf:"bytes,3,opt,name=renew,proto3,oneof"`
+	Renew *RenewRaftCommand `protobuf:"bytes,4,opt,name=renew,proto3,oneof"`
 }
+
+func (*RaftCommand_LeaderChangeConf) isRaftCommand_Cmd() {}
 
 func (*RaftCommand_Acquire) isRaftCommand_Cmd() {}
 
 func (*RaftCommand_Release) isRaftCommand_Cmd() {}
 
 func (*RaftCommand_Renew) isRaftCommand_Cmd() {}
+
+type LeaderConfiguration struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NodeId        string                 `protobuf:"bytes,1,opt,name=node_id,json=nodeId,proto3" json:"node_id,omitempty"`
+	RaftAddr      string                 `protobuf:"bytes,2,opt,name=raft_addr,json=raftAddr,proto3" json:"raft_addr,omitempty"`
+	GrpcAddr      string                 `protobuf:"bytes,3,opt,name=grpc_addr,json=grpcAddr,proto3" json:"grpc_addr,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaderConfiguration) Reset() {
+	*x = LeaderConfiguration{}
+	mi := &file_internal_proto_lock_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaderConfiguration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaderConfiguration) ProtoMessage() {}
+
+func (x *LeaderConfiguration) ProtoReflect() protoreflect.Message {
+	mi := &file_internal_proto_lock_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaderConfiguration.ProtoReflect.Descriptor instead.
+func (*LeaderConfiguration) Descriptor() ([]byte, []int) {
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *LeaderConfiguration) GetNodeId() string {
+	if x != nil {
+		return x.NodeId
+	}
+	return ""
+}
+
+func (x *LeaderConfiguration) GetRaftAddr() string {
+	if x != nil {
+		return x.RaftAddr
+	}
+	return ""
+}
+
+func (x *LeaderConfiguration) GetGrpcAddr() string {
+	if x != nil {
+		return x.GrpcAddr
+	}
+	return ""
+}
 
 type LockEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -751,7 +887,7 @@ type LockEntry struct {
 
 func (x *LockEntry) Reset() {
 	*x = LockEntry{}
-	mi := &file_internal_proto_lock_proto_msgTypes[10]
+	mi := &file_internal_proto_lock_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -763,7 +899,7 @@ func (x *LockEntry) String() string {
 func (*LockEntry) ProtoMessage() {}
 
 func (x *LockEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[10]
+	mi := &file_internal_proto_lock_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -776,7 +912,7 @@ func (x *LockEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LockEntry.ProtoReflect.Descriptor instead.
 func (*LockEntry) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{10}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *LockEntry) GetKey() string {
@@ -811,6 +947,7 @@ type SnapshotItem struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Item:
 	//
+	//	*SnapshotItem_LeaderConf
 	//	*SnapshotItem_Lock
 	Item          isSnapshotItem_Item `protobuf_oneof:"item"`
 	unknownFields protoimpl.UnknownFields
@@ -819,7 +956,7 @@ type SnapshotItem struct {
 
 func (x *SnapshotItem) Reset() {
 	*x = SnapshotItem{}
-	mi := &file_internal_proto_lock_proto_msgTypes[11]
+	mi := &file_internal_proto_lock_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -831,7 +968,7 @@ func (x *SnapshotItem) String() string {
 func (*SnapshotItem) ProtoMessage() {}
 
 func (x *SnapshotItem) ProtoReflect() protoreflect.Message {
-	mi := &file_internal_proto_lock_proto_msgTypes[11]
+	mi := &file_internal_proto_lock_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -844,12 +981,21 @@ func (x *SnapshotItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SnapshotItem.ProtoReflect.Descriptor instead.
 func (*SnapshotItem) Descriptor() ([]byte, []int) {
-	return file_internal_proto_lock_proto_rawDescGZIP(), []int{11}
+	return file_internal_proto_lock_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SnapshotItem) GetItem() isSnapshotItem_Item {
 	if x != nil {
 		return x.Item
+	}
+	return nil
+}
+
+func (x *SnapshotItem) GetLeaderConf() *LeaderConfiguration {
+	if x != nil {
+		if x, ok := x.Item.(*SnapshotItem_LeaderConf); ok {
+			return x.LeaderConf
+		}
 	}
 	return nil
 }
@@ -867,9 +1013,15 @@ type isSnapshotItem_Item interface {
 	isSnapshotItem_Item()
 }
 
-type SnapshotItem_Lock struct {
-	Lock *LockEntry `protobuf:"bytes,1,opt,name=lock,proto3,oneof"`
+type SnapshotItem_LeaderConf struct {
+	LeaderConf *LeaderConfiguration `protobuf:"bytes,1,opt,name=leader_conf,json=leaderConf,proto3,oneof"`
 }
+
+type SnapshotItem_Lock struct {
+	Lock *LockEntry `protobuf:"bytes,2,opt,name=lock,proto3,oneof"`
+}
+
+func (*SnapshotItem_LeaderConf) isSnapshotItem_Item() {}
 
 func (*SnapshotItem_Lock) isSnapshotItem_Item() {}
 
@@ -913,7 +1065,11 @@ const file_internal_proto_lock_proto_rawDesc = "" +
 	"\rfencing_token\x18\x05 \x01(\x04R\ffencingToken\x12\x1b\n" +
 	"\texpire_at\x18\x06 \x01(\x03R\bexpireAt\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\a \x01(\x03R\texpiresIn\"~\n" +
+	"expires_in\x18\a \x01(\x03R\texpiresIn\"p\n" +
+	"\x1bLeaderChangeConfRaftCommand\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\traft_addr\x18\x02 \x01(\tR\braftAddr\x12\x1b\n" +
+	"\tgrpc_addr\x18\x03 \x01(\tR\bgrpcAddr\"~\n" +
 	"\x12AcquireRaftCommand\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12#\n" +
@@ -927,19 +1083,26 @@ const file_internal_proto_lock_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12#\n" +
 	"\rfencing_token\x18\x03 \x01(\x04R\ffencingToken\x12\x1b\n" +
-	"\texpire_at\x18\x04 \x01(\x03R\bexpireAt\"\xb0\x01\n" +
-	"\vRaftCommand\x124\n" +
-	"\aacquire\x18\x01 \x01(\v2\x18.lock.AcquireRaftCommandH\x00R\aacquire\x124\n" +
-	"\arelease\x18\x02 \x01(\v2\x18.lock.ReleaseRaftCommandH\x00R\arelease\x12.\n" +
-	"\x05renew\x18\x03 \x01(\v2\x16.lock.RenewRaftCommandH\x00R\x05renewB\x05\n" +
-	"\x03cmd\"u\n" +
+	"\texpire_at\x18\x04 \x01(\x03R\bexpireAt\"\x83\x02\n" +
+	"\vRaftCommand\x12Q\n" +
+	"\x12leader_change_conf\x18\x01 \x01(\v2!.lock.LeaderChangeConfRaftCommandH\x00R\x10leaderChangeConf\x124\n" +
+	"\aacquire\x18\x02 \x01(\v2\x18.lock.AcquireRaftCommandH\x00R\aacquire\x124\n" +
+	"\arelease\x18\x03 \x01(\v2\x18.lock.ReleaseRaftCommandH\x00R\arelease\x12.\n" +
+	"\x05renew\x18\x04 \x01(\v2\x16.lock.RenewRaftCommandH\x00R\x05renewB\x05\n" +
+	"\x03cmd\"h\n" +
+	"\x13LeaderConfiguration\x12\x17\n" +
+	"\anode_id\x18\x01 \x01(\tR\x06nodeId\x12\x1b\n" +
+	"\traft_addr\x18\x02 \x01(\tR\braftAddr\x12\x1b\n" +
+	"\tgrpc_addr\x18\x03 \x01(\tR\bgrpcAddr\"u\n" +
 	"\tLockEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05owner\x18\x02 \x01(\tR\x05owner\x12#\n" +
 	"\rfencing_token\x18\x03 \x01(\x04R\ffencingToken\x12\x1b\n" +
-	"\texpire_at\x18\x04 \x01(\x03R\bexpireAt\"=\n" +
-	"\fSnapshotItem\x12%\n" +
-	"\x04lock\x18\x01 \x01(\v2\x0f.lock.LockEntryH\x00R\x04lockB\x06\n" +
+	"\texpire_at\x18\x04 \x01(\x03R\bexpireAt\"{\n" +
+	"\fSnapshotItem\x12<\n" +
+	"\vleader_conf\x18\x01 \x01(\v2\x19.lock.LeaderConfigurationH\x00R\n" +
+	"leaderConf\x12%\n" +
+	"\x04lock\x18\x02 \x01(\v2\x0f.lock.LockEntryH\x00R\x04lockB\x06\n" +
 	"\x04item2\x97\x01\n" +
 	"\vLockService\x12.\n" +
 	"\aAcquire\x12\x10.lock.AcquireReq\x1a\x11.lock.AcquireResp\x12.\n" +
@@ -958,37 +1121,41 @@ func file_internal_proto_lock_proto_rawDescGZIP() []byte {
 	return file_internal_proto_lock_proto_rawDescData
 }
 
-var file_internal_proto_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_internal_proto_lock_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_internal_proto_lock_proto_goTypes = []any{
-	(*AcquireReq)(nil),         // 0: lock.AcquireReq
-	(*AcquireResp)(nil),        // 1: lock.AcquireResp
-	(*ReleaseReq)(nil),         // 2: lock.ReleaseReq
-	(*ReleaseResp)(nil),        // 3: lock.ReleaseResp
-	(*RenewReq)(nil),           // 4: lock.RenewReq
-	(*RenewResp)(nil),          // 5: lock.RenewResp
-	(*AcquireRaftCommand)(nil), // 6: lock.AcquireRaftCommand
-	(*ReleaseRaftCommand)(nil), // 7: lock.ReleaseRaftCommand
-	(*RenewRaftCommand)(nil),   // 8: lock.RenewRaftCommand
-	(*RaftCommand)(nil),        // 9: lock.RaftCommand
-	(*LockEntry)(nil),          // 10: lock.LockEntry
-	(*SnapshotItem)(nil),       // 11: lock.SnapshotItem
+	(*AcquireReq)(nil),                  // 0: lock.AcquireReq
+	(*AcquireResp)(nil),                 // 1: lock.AcquireResp
+	(*ReleaseReq)(nil),                  // 2: lock.ReleaseReq
+	(*ReleaseResp)(nil),                 // 3: lock.ReleaseResp
+	(*RenewReq)(nil),                    // 4: lock.RenewReq
+	(*RenewResp)(nil),                   // 5: lock.RenewResp
+	(*LeaderChangeConfRaftCommand)(nil), // 6: lock.LeaderChangeConfRaftCommand
+	(*AcquireRaftCommand)(nil),          // 7: lock.AcquireRaftCommand
+	(*ReleaseRaftCommand)(nil),          // 8: lock.ReleaseRaftCommand
+	(*RenewRaftCommand)(nil),            // 9: lock.RenewRaftCommand
+	(*RaftCommand)(nil),                 // 10: lock.RaftCommand
+	(*LeaderConfiguration)(nil),         // 11: lock.LeaderConfiguration
+	(*LockEntry)(nil),                   // 12: lock.LockEntry
+	(*SnapshotItem)(nil),                // 13: lock.SnapshotItem
 }
 var file_internal_proto_lock_proto_depIdxs = []int32{
-	6,  // 0: lock.RaftCommand.acquire:type_name -> lock.AcquireRaftCommand
-	7,  // 1: lock.RaftCommand.release:type_name -> lock.ReleaseRaftCommand
-	8,  // 2: lock.RaftCommand.renew:type_name -> lock.RenewRaftCommand
-	10, // 3: lock.SnapshotItem.lock:type_name -> lock.LockEntry
-	0,  // 4: lock.LockService.Acquire:input_type -> lock.AcquireReq
-	2,  // 5: lock.LockService.Release:input_type -> lock.ReleaseReq
-	4,  // 6: lock.LockService.Renew:input_type -> lock.RenewReq
-	1,  // 7: lock.LockService.Acquire:output_type -> lock.AcquireResp
-	3,  // 8: lock.LockService.Release:output_type -> lock.ReleaseResp
-	5,  // 9: lock.LockService.Renew:output_type -> lock.RenewResp
-	7,  // [7:10] is the sub-list for method output_type
-	4,  // [4:7] is the sub-list for method input_type
-	4,  // [4:4] is the sub-list for extension type_name
-	4,  // [4:4] is the sub-list for extension extendee
-	0,  // [0:4] is the sub-list for field type_name
+	6,  // 0: lock.RaftCommand.leader_change_conf:type_name -> lock.LeaderChangeConfRaftCommand
+	7,  // 1: lock.RaftCommand.acquire:type_name -> lock.AcquireRaftCommand
+	8,  // 2: lock.RaftCommand.release:type_name -> lock.ReleaseRaftCommand
+	9,  // 3: lock.RaftCommand.renew:type_name -> lock.RenewRaftCommand
+	11, // 4: lock.SnapshotItem.leader_conf:type_name -> lock.LeaderConfiguration
+	12, // 5: lock.SnapshotItem.lock:type_name -> lock.LockEntry
+	0,  // 6: lock.LockService.Acquire:input_type -> lock.AcquireReq
+	2,  // 7: lock.LockService.Release:input_type -> lock.ReleaseReq
+	4,  // 8: lock.LockService.Renew:input_type -> lock.RenewReq
+	1,  // 9: lock.LockService.Acquire:output_type -> lock.AcquireResp
+	3,  // 10: lock.LockService.Release:output_type -> lock.ReleaseResp
+	5,  // 11: lock.LockService.Renew:output_type -> lock.RenewResp
+	9,  // [9:12] is the sub-list for method output_type
+	6,  // [6:9] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_internal_proto_lock_proto_init() }
@@ -996,12 +1163,14 @@ func file_internal_proto_lock_proto_init() {
 	if File_internal_proto_lock_proto != nil {
 		return
 	}
-	file_internal_proto_lock_proto_msgTypes[9].OneofWrappers = []any{
+	file_internal_proto_lock_proto_msgTypes[10].OneofWrappers = []any{
+		(*RaftCommand_LeaderChangeConf)(nil),
 		(*RaftCommand_Acquire)(nil),
 		(*RaftCommand_Release)(nil),
 		(*RaftCommand_Renew)(nil),
 	}
-	file_internal_proto_lock_proto_msgTypes[11].OneofWrappers = []any{
+	file_internal_proto_lock_proto_msgTypes[13].OneofWrappers = []any{
+		(*SnapshotItem_LeaderConf)(nil),
 		(*SnapshotItem_Lock)(nil),
 	}
 	type x struct{}
@@ -1010,7 +1179,7 @@ func file_internal_proto_lock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internal_proto_lock_proto_rawDesc), len(file_internal_proto_lock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

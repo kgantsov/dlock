@@ -18,11 +18,9 @@ import (
 
 func TestNew(t *testing.T) {
 	httpAddr := "8080"
-	grpcAddr := "localhost:12002"
-	raftAddr := "localhost:12001"
 	store := newTestStore()
 
-	service := New(httpAddr, grpcAddr, raftAddr, store)
+	service := New(httpAddr, store)
 
 	assert.NotNil(t, service)
 	assert.NotNil(t, service.router)
@@ -201,16 +199,13 @@ func TestJoin(t *testing.T) {
 	store := newTestStore()
 
 	h := &Handler{
-		node:     store,
-		grpcAddr: "localhost:9000",
-		raftAddr: "localhost:10000",
+		node: store,
 	}
 	h.RegisterRoutes(api)
 
 	type SuccessOutput struct {
 		ID       string `json:"id"`
 		RaftAddr string `json:"raft_addr"`
-		GrpcAddr string `json:"grpc_addr"`
 	}
 	type ErrorOutput struct {
 		Title  string `json:"title"`
@@ -221,7 +216,6 @@ func TestJoin(t *testing.T) {
 	resp := api.Post("/join", map[string]any{
 		"id":        "dlock-node-1",
 		"raft_addr": "localhost:10001",
-		"grpc_addr": "localhost:9001",
 	})
 
 	successOutput := &SuccessOutput{}
@@ -229,9 +223,8 @@ func TestJoin(t *testing.T) {
 	json.Unmarshal(resp.Body.Bytes(), successOutput)
 
 	assert.Equal(t, http.StatusOK, resp.Code)
-	assert.Equal(t, "dlock-node-0", successOutput.ID)
-	assert.Equal(t, "localhost:10000", successOutput.RaftAddr)
-	assert.Equal(t, "localhost:9000", successOutput.GrpcAddr)
+	assert.Equal(t, "dlock-node-1", successOutput.ID)
+	assert.Equal(t, "localhost:10001", successOutput.RaftAddr)
 }
 
 type testStore struct {
@@ -280,14 +273,10 @@ func (t *testStore) Release(key, owner string, fencingToken uint64) error {
 	return nil
 }
 
-func (t *testStore) Join(nodeID, addr, grpcAddr string) error {
+func (t *testStore) Join(nodeID, addr string) error {
 	return nil
 }
 
 func (t *testStore) NodeID() string {
 	return "dlock-node-0"
-}
-
-func (t *testStore) SetNodeAddr(nodeID, raftAddr, grpcAddr string) {
-
 }
