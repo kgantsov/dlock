@@ -29,15 +29,10 @@ func (p *Proxy) initClient(leader string) error {
 
 	host := leader
 
-	// if p.port != 0 {
-	// 	host = fmt.Sprintf("%s:%d", host, p.port)
-	// }
-
 	conn, err := grpc.Dial(host, grpc.WithInsecure())
 	if err != nil {
 		log.Fatal().Msgf("Failed to connect: %v", err)
 	}
-	// defer conn.Close()
 
 	p.client = pb.NewLockServiceClient(conn)
 
@@ -95,4 +90,34 @@ func (p *Proxy) Release(host string, key, owner string, fencingToken uint64) err
 	}
 
 	return nil
+}
+
+func (p *Proxy) Renew(host string, key, owner string, fencingToken uint64, ttl int64) (*domain.LockEntry, error) {
+	log.Info().Msgf("PROXY Renew to the leader node: %s %s %s %d %d", host, key, owner, fencingToken, ttl)
+
+	if p.leader != host || p.client == nil {
+		if err := p.initClient(host); err != nil {
+			return nil, err
+		}
+	}
+
+	req := &pb.RenewReq{
+		Key:          key,
+		Owner:        owner,
+		FencingToken: fencingToken,
+		Ttl:          ttl,
+	}
+
+	resp, err := p.client.Renew(context.Background(), req)
+	if err != nil {
+		log.Error().Msgf("Failed to renew lock: %v", err)
+		return nil, err
+	}
+
+	return &domain.LockEntry{
+		Key:          resp.Key,
+		Owner:        resp.Owner,
+		ExpireAt:     resp.ExpireAt,
+		FencingToken: resp.FencingToken,
+	}, nil
 }

@@ -91,3 +91,47 @@ func (h *Handler) Release(ctx context.Context, input *ReleaseInput) (*ReleaseOut
 	}
 	return res, nil
 }
+
+func (h *Handler) Renew(ctx context.Context, input *RenewInput) (*RenewOutput, error) {
+	key := input.Key
+	owner := input.Body.Owner
+	ttl := input.Body.TTL
+
+	if key == "" {
+		return nil, huma.Error400BadRequest("Key is required", domain.ErrInvalidKey)
+	}
+	if owner == "" {
+		return nil, huma.Error400BadRequest("Owner is required", domain.ErrInvalidOwner)
+	}
+	if input.Body.FencingToken == "" {
+		return nil, huma.Error400BadRequest("Fencing token is required", domain.ErrInvalidFencingToken)
+	}
+	if ttl <= 0 {
+		return nil, huma.Error400BadRequest("TTL must be greater than zero", domain.ErrInvalidTTL)
+	}
+
+	fencingToken, err := strconv.ParseUint(input.Body.FencingToken, 10, 64)
+	if err != nil {
+		return nil, huma.Error500InternalServerError(
+			"Failed to parse fencing token", domain.ErrInvalidFencingToken,
+		)
+	}
+
+	lock, err := h.node.Renew(key, owner, fencingToken, ttl)
+	if err != nil {
+		return nil, huma.Error400BadRequest("Failed to renew a lock", err)
+	}
+
+	res := &RenewOutput{
+		Status: http.StatusOK,
+		Body: RenewOutputBody{
+			Status: "RENEWED",
+			Owner:  lock.Owner,
+			// Convert uint64 to string to avoid precision loss in JavaScript
+			FencingToken: strconv.FormatUint(lock.FencingToken, 10),
+			ExpireAt:     time.Unix(lock.ExpireAt, 0),
+			// ExpiresIn:    ttl,
+		},
+	}
+	return res, nil
+}

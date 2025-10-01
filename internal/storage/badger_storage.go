@@ -50,10 +50,8 @@ func (s *BadgerStorage) Acquire(key, owner string, fencingToken uint64, expireAt
 		lock, err := domain.LockEntryFromBytes(val)
 
 		if err == nil {
-			if err == nil {
-				if time.Now().Before(time.Unix(lock.ExpireAt, 0)) {
-					return nil, domain.ErrLockAlreadyAcquired
-				}
+			if time.Now().Before(time.Unix(lock.ExpireAt, 0)) {
+				return nil, domain.ErrLockAlreadyAcquired
 			}
 		}
 	}
@@ -121,6 +119,64 @@ func (s *BadgerStorage) Release(key, owner string, fencingToken uint64) error {
 	}
 
 	return txn.Commit()
+}
+
+func (s *BadgerStorage) Renew(key, owner string, fencingToken uint64, expireAt time.Time) (*domain.LockEntry, error) {
+	txn := s.db.NewTransaction(true)
+	defer txn.Discard()
+
+	item, err := txn.Get(addPrefix(dbLock, []byte(key)))
+	if err != nil {
+		return nil, domain.ErrLockNotFound
+	}
+
+	val, err := item.ValueCopy(nil)
+	if err != nil {
+		return nil, err
+	}
+	lock, err := domain.LockEntryFromBytes(val)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if lock.Owner != owner {
+		log.Info().
+			Str("key", key).
+			Str("owner", owner).
+			Str("lock_owner", lock.Owner).
+			Msg("Owner mismatch")
+		return nil, domain.ErrOwnerMismatch
+	}
+
+	if lock.FencingToken != fencingToken {
+		log.Info().
+			Str("key", key).
+			Msgf("Fencing token mismatch: %d != %d", lock.FencingToken, fencingToken)
+		return nil, domain.ErrFencingTokenMismatch
+	}
+
+	lock.ExpireAt = expireAt.Unix()
+
+	lockBytes, err := lock.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	e := badger.NewEntry(
+		addPrefix(dbLock, []byte(key)),
+		lockBytes,
+	).WithTTL(expireAt.Sub(time.Now().UTC()))
+
+	if err := txn.SetEntry(e); err != nil {
+		return nil, err
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		return nil, err
+	}
+	return lock, nil
 }
 
 func (s *BadgerStorage) Locks() []string {

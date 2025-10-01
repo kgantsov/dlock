@@ -85,3 +85,36 @@ func (s *SyncroLockServer) Release(ctx context.Context, req *pb.ReleaseReq) (*pb
 	log.Info().Msgf("Release: key=%s, owner=%s", req.Key, req.Owner)
 	return resp, nil
 }
+
+func (s *SyncroLockServer) Renew(ctx context.Context, req *pb.RenewReq) (*pb.RenewResp, error) {
+	if req.Key == "" {
+		return nil, domain.ErrInvalidKey
+	}
+	if req.Owner == "" {
+		return nil, domain.ErrInvalidOwner
+	}
+	if req.FencingToken == 0 {
+		return nil, domain.ErrInvalidFencingToken
+	}
+	if req.Ttl <= 0 {
+		return nil, domain.ErrInvalidTTL
+	}
+
+	lock, err := s.node.Renew(req.Key, req.Owner, req.FencingToken, req.Ttl)
+	if err != nil {
+		return &pb.RenewResp{
+			Success: false,
+		}, err
+	}
+	resp := &pb.RenewResp{
+		Success:      true,
+		Key:          req.Key,
+		Owner:        lock.Owner,
+		FencingToken: lock.FencingToken,
+		ExpireAt:     lock.ExpireAt,
+		ExpiresIn:    req.Ttl,
+	}
+
+	log.Info().Msgf("Renew: key=%s, owner=%s, ttl=%d", req.Key, req.Owner, req.Ttl)
+	return resp, nil
+}

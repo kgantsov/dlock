@@ -307,6 +307,49 @@ func (n *Node) Release(key, owner string, fencingToken uint64) error {
 	return nil
 }
 
+func (n *Node) Renew(key, owner string, fencingToken uint64, ttl int64) (*domain.LockEntry, error) {
+	if n.raft.State() != raft.Leader {
+		leaderGrpcAddr := n.leaderConfig.GetLeaderGrpcAddress()
+
+		return n.proxy.Renew(leaderGrpcAddr, key, owner, fencingToken, ttl)
+	}
+
+	expireAt := time.Now().UTC().Add(time.Second * time.Duration(ttl))
+
+	cmd := &pb.RaftCommand{
+		Cmd: &pb.RaftCommand_Renew{
+			Renew: &pb.RenewRaftCommand{
+				Key:          key,
+				Owner:        owner,
+				FencingToken: fencingToken,
+				ExpireAt:     expireAt.Unix(),
+			},
+		},
+	}
+
+	data, err := proto.Marshal(cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	f := n.raft.Apply(data, raftTimeout)
+
+	if f.Error() != nil {
+		return nil, f.Error()
+	}
+
+	r := f.Response().(*pb.RenewResp)
+	if r.Error != "" {
+		return nil, fmt.Errorf("%s", r.Error)
+	}
+	return &domain.LockEntry{
+		Key:          r.Key,
+		Owner:        r.Owner,
+		FencingToken: r.FencingToken,
+		ExpireAt:     r.ExpireAt,
+	}, nil
+}
+
 // Join joins a node, identified by nodeID and located at addr, to this store.
 // The node must be ready to respond to Raft communications at that address.
 func (n *Node) Join(nodeID, raftAddr string) error {

@@ -35,6 +35,8 @@ func (f *FSM) Apply(raftLog *raft.Log) interface{} {
 		return f.applyAcquire(command)
 	case *pb.RaftCommand_Release:
 		return f.applyRelease(command)
+	case *pb.RaftCommand_Renew:
+		return f.applyRenew(command)
 	default:
 		return fmt.Errorf("unknown command: %s", c.Cmd)
 	}
@@ -173,4 +175,31 @@ func (f *FSM) applyRelease(payload *pb.RaftCommand_Release) interface{} {
 		}
 	}
 	return &pb.ReleaseResp{Success: true}
+}
+
+func (f *FSM) applyRenew(payload *pb.RaftCommand_Renew) interface{} {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	expireAt := time.Unix(payload.Renew.ExpireAt, 0)
+	lock, err := f.storage.Renew(
+		payload.Renew.Key,
+		payload.Renew.Owner,
+		payload.Renew.FencingToken,
+		expireAt,
+	)
+
+	if err != nil {
+		return &pb.RenewResp{
+			Key:   payload.Renew.Key,
+			Error: err.Error(),
+		}
+	}
+
+	return &pb.RenewResp{
+		Key:          payload.Renew.Key,
+		Owner:        lock.Owner,
+		FencingToken: lock.FencingToken,
+		ExpireAt:     lock.ExpireAt,
+	}
 }

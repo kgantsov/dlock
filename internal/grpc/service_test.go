@@ -28,6 +28,14 @@ func (m *MockNode) Release(key, owner string, fencingToken uint64) error {
 	return args.Error(0)
 }
 
+func (m *MockNode) Renew(key, owner string, fencingToken uint64, ttl int64) (*domain.LockEntry, error) {
+	args := m.Called(key, owner, fencingToken, ttl)
+	if args.Get(0) != nil {
+		return args.Get(0).(*domain.LockEntry), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockNode) Join(nodeID, raftAddr string) error {
 	args := m.Called(nodeID, raftAddr)
 	return args.Error(0)
@@ -123,4 +131,56 @@ func TestSyncroLockServer_Release(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, resp.Success)
 	node.AssertCalled(t, "Release", "key-2", "owner", uint64(124))
+}
+
+func TestSyncroLockServer_Renew(t *testing.T) {
+	node := new(MockNode)
+	server := NewSyncroLockServer(node, 1234)
+	ctx := context.Background()
+
+	// Invalid key
+	req := &pb.RenewReq{Key: "", Owner: "owner", FencingToken: 1, Ttl: 10}
+	resp, err := server.Renew(ctx, req)
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, domain.ErrInvalidKey)
+
+	// Invalid owner
+	req = &pb.RenewReq{Key: "key", Owner: "", FencingToken: 1, Ttl: 10}
+	resp, err = server.Renew(ctx, req)
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, domain.ErrInvalidOwner)
+
+	// Invalid fencing token
+	req = &pb.RenewReq{Key: "key", Owner: "owner", FencingToken: 0, Ttl: 10}
+	resp, err = server.Renew(ctx, req)
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, domain.ErrInvalidFencingToken)
+
+	// Invalid TTL
+	req = &pb.RenewReq{Key: "key", Owner: "owner", FencingToken: 1, Ttl: 0}
+	resp, err = server.Renew(ctx, req)
+	assert.Nil(t, resp)
+	assert.ErrorIs(t, err, domain.ErrInvalidTTL)
+
+	// Renew error from node
+	req = &pb.RenewReq{Key: "key-1", Owner: "owner", FencingToken: 123, Ttl: 10}
+	node.On("Renew", "key-1", "owner", uint64(123), int64(10)).Return(nil, errors.New("renew failed"))
+	resp, err = server.Renew(ctx, req)
+	assert.NotNil(t, resp)
+	assert.False(t, resp.Success)
+	assert.Error(t, err)
+	node.AssertCalled(t, "Renew", "key-1", "owner", uint64(123), int64(10))
+
+	// Successful renew
+	req = &pb.RenewReq{Key: "key-2", Owner: "owner", FencingToken: 124, Ttl: 10}
+	lock := &domain.LockEntry{Owner: "owner", FencingToken: 124, ExpireAt: 200}
+	node.On("Renew", "key-2", "owner", uint64(124), int64(10)).Return(lock, nil)
+	resp, err = server.Renew(ctx, req)
+	assert.NoError(t, err)
+	assert.True(t, resp.Success)
+	assert.Equal(t, "key-2", resp.Key)
+	assert.Equal(t, "owner", resp.Owner)
+	assert.Equal(t, uint64(124), resp.FencingToken)
+	assert.Equal(t, int64(200), resp.ExpireAt)
+	assert.Equal(t, int64(10), resp.ExpiresIn)
 }

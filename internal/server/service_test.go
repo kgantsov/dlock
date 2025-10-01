@@ -192,6 +192,42 @@ func TestRelease(t *testing.T) {
 	assert.Equal(t, "Failed to release a lock", errorOutput.Detail)
 }
 
+func TestRenew(t *testing.T) {
+	_, api := humatest.New(t)
+
+	store := newTestStore()
+
+	h := &Handler{
+		node: store,
+	}
+	h.RegisterRoutes(api)
+
+	type SuccessOutput struct {
+		Status       string `json:"status"`
+		FencingToken string `json:"fencing_token,omitempty"`
+	}
+	type ErrorOutput struct {
+		Title  string `json:"title"`
+		Status int    `json:"status"`
+		Detail string `json:"detail"`
+	}
+
+	resp := api.Post("/API/v1/locks/my_lock/renew", map[string]any{
+		"owner":         "owner-1",
+		"fencing_token": "123",
+		"ttl":           5,
+	})
+
+	errorOutput := &ErrorOutput{}
+
+	json.Unmarshal(resp.Body.Bytes(), errorOutput)
+
+	assert.Equal(t, http.StatusBadRequest, resp.Code)
+	assert.Equal(t, "Bad Request", errorOutput.Title)
+	assert.Equal(t, 400, errorOutput.Status)
+	assert.Equal(t, "Failed to renew a lock", errorOutput.Detail)
+}
+
 // TestJoin tests the join endpoint.
 func TestJoin(t *testing.T) {
 	_, api := humatest.New(t)
@@ -271,6 +307,25 @@ func (t *testStore) Release(key, owner string, fencingToken uint64) error {
 
 	delete(t.m, key)
 	return nil
+}
+
+func (t *testStore) Renew(key, owner string, fencingToken uint64, ttl int64) (*domain.LockEntry, error) {
+	lock, ok := t.m[key]
+	if !ok {
+		return nil, fmt.Errorf("Failed to renew a lock for a key: %s", key)
+	}
+
+	if lock.Owner != owner {
+		return nil, domain.ErrOwnerMismatch
+	}
+
+	if lock.FencingToken != fencingToken {
+		return nil, domain.ErrFencingTokenMismatch
+	}
+
+	lock.ExpireAt = time.Now().UTC().Add(time.Second * time.Duration(ttl)).Unix()
+	t.m[key] = lock
+	return lock, nil
 }
 
 func (t *testStore) Join(nodeID, addr string) error {

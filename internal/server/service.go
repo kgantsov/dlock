@@ -25,6 +25,9 @@ type Node interface {
 	// Release releases a lock for the given key.
 	Release(key, owner string, fencingToken uint64) error
 
+	// Renew renews a lock for the given key.
+	Renew(key, owner string, fencingToken uint64, ttl int64) (*domain.LockEntry, error)
+
 	// Join joins the node, identitifed by nodeID and reachable at raftAddr, to the cluster.
 	Join(nodeID string, raftAddr string) error
 
@@ -117,6 +120,18 @@ func (h *Handler) RegisterRoutes(api huma.API) {
 			Tags:        []string{"Locks"},
 		},
 		h.Release,
+	)
+	huma.Register(
+		api,
+		huma.Operation{
+			OperationID: "renew-lock",
+			Method:      http.MethodPost,
+			Path:        "/API/v1/locks/{key}/renew",
+			Summary:     "Renew lock",
+			Description: "An endpoint that is used for renewing a lock",
+			Tags:        []string{"Locks"},
+		},
+		h.Renew,
 	)
 }
 

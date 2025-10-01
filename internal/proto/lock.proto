@@ -41,6 +41,7 @@ message RenewReq {
     uint64 fencing_token = 3;   // optional safeguard
     int64 ttl = 4;
 }
+
 message RenewResp {
     bool success = 1;
     string error = 2;
